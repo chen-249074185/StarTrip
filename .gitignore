@@ -37,6 +37,9 @@ logs/
 data/
 uploads/
 
+# ===== 本地记录（不公开）=====
+docs/DEVLOG.md
+
 # ===== 系统 =====
 Thumbs.db
 .DS_Store
