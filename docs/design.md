@@ -1,22 +1,21 @@
-# StarTrip Agent · 多 Agent 旅行规划系统 —— 详细技术方案（v2）
+# StarTrip Agent · 多 Agent 旅行规划系统 —— 技术设计
 
-> 版本：v2 定稿（LangGraph 技术栈）
-> 状态：开发计划 4 天 · 简历条目已同步
-> 面试定位：Python / AI Agent 岗位的核心展示项目
+> 版本：v2（LangGraph 技术栈）
+> 定位：Python / AI Agent 展示项目
 
 ---
 
 ## 1. 项目概述
 
 ### 1.1 定位
-基于 Python 的**多 Agent 旅行规划系统**：用户以自然语言描述出行需求（目的地、天数、预算、偏好），系统通过 LangGraph 图式编排多个 Agent 节点（规划/执行/审查），调度高德 MCP 与天气服务完成数据采集，结合 RAG 知识库增强推荐，最终输出带评分的完整行程方案，并在 Web 端以行程卡片 + 高德地图可视化呈现。
+基于 Python 的**多 Agent 旅行规划系统**：用户以自然语言描述出行需求（目的地、天数、预算、偏好），系统通过 LangGraph 图式编排多个 Agent 节点（规划 / 执行 / RAG / 审查），调度高德与天气服务完成数据采集，结合 RAG 知识库增强推荐，最终输出带评分的完整行程方案，并在 Web 端以行程卡片 + 高德地图可视化呈现。
 
-### 1.2 核心卖点（面试关键词）
+### 1.2 核心特性
 - 多 Agent 图式编排（LangGraph 状态图 + 条件回环）
-- MCP 工具编排（高德 MCP：POI 检索 / 路线规划 / 周边查询）
-- asyncio 并发工具调用（多工具并行，响应链路优化）
-- RAG 检索增强（PostgreSQL + pgvector 向量检索）
-- 行程质量多目标评测（时间衔接 / 距离 / 偏好匹配）
+- 工具编排（高德 POI 检索 / 路线规划 / 周边查询 + 天气）
+- asyncio 并发工具调用（多工具并行，优化响应链路）
+- RAG 检索增强（PostgreSQL + pgvector，查询改写 + 混合检索）
+- 行程质量多目标评测（时间衔接 / 距离 / 偏好匹配 / 预算 / 天气）
 - 多轮对话记忆（Redis 偏好跨轮复用）
 - Web 端实时交互（FastAPI SSE 流式输出 + Vue 3 前端 + 高德 JS API 地图可视化）
 
@@ -29,33 +28,33 @@
 
 | 层 | 选型 | 理由 |
 |---|---|---|
-| Web 框架 | FastAPI | Python 异步首选、原生 SSE 支持、pydantic 校验，2026 Agent 岗标配 |
-| Agent 编排 | LangGraph | LangChain 官方图式编排框架，状态管理 + 条件边 + 回环，面试热点 |
-| LLM | DashScope（通义千问） | 用户已有 API、Function Calling 成熟 |
-| 工具 | 高德 MCP（POI/路线/周边）+ 天气服务 | MCP 协议 + 真实业务工具编排 |
-| 向量库 | PostgreSQL + pgvector | 生产级"一库两用"（业务数据 + 向量），比 Qdrant 更贴合后端岗面试 |
-| 缓存/记忆 | Redis | 偏好缓存 + TTL，复用用户既有 Redis 经验 |
-| 前端 | Vue 3 + Vite + 高德 JS API | 组件化 + 响应式，行程卡片/流式对话易维护；工程规范、面试加分 |
+| Web 框架 | FastAPI | Python 异步首选、原生 SSE 支持、pydantic 校验 |
+| Agent 编排 | LangGraph | 官方图式编排框架，状态管理 + 条件边 + 回环 |
+| LLM | DashScope（通义千问） | Function Calling 成熟、生态完善 |
+| 工具 | 高德（POI/路线/周边）+ 天气服务 | 真实业务工具编排 |
+| 向量库 | PostgreSQL + pgvector | 生产级"一库两用"（业务数据 + 向量） |
+| 缓存/记忆 | Redis | 偏好缓存 + TTL |
+| 前端 | Vue 3 + Vite + 高德 JS API | 组件化 + 响应式，行程卡片/流式对话易维护 |
 | 测试 | pytest + httpx | 覆盖图全链路与 API |
-| 部署 | docker-compose（PG + Redis） | 与用户既有 Docker 经验一致 |
+| 部署 | docker-compose（PG + Redis） | 一键起本地依赖 |
 
-### 2.1 模型选型（本项目实际使用）
+### 2.1 模型选型
 
 | 用途 | 模型 | 说明 |
 |---|---|---|
 | LLM（规划/审查节点） | 通义千问 qwen-plus（DashScope） | 需求→任务拆解（Function Calling 输出 JSON 工具清单）；行程生成 + 5 维评分；回环时携带 feedback 修正 |
 | Embedding（RAG） | text-embedding-v3（DashScope） | 攻略文档/查询向量化（1024 维），供 pgvector 余弦检索 |
-| 执行节点 | 非 LLM（纯工具调度） | asyncio + MCP 客户端直接调用高德/天气 API，无需 LLM 推理 |
+| 执行节点 | 非 LLM（纯工具调度） | asyncio + 高德/天气 API 直接调用，无需 LLM 推理 |
 
-### 2.2 多 Agent 澄清（面试必答）
+### 2.2 多 Agent 设计说明
 
 **多 Agent 不是"多个大模型"，而是"多个角色节点"**——由同一个 LLM（qwen-plus）通过不同 System Prompt 扮演不同角色驱动：
 
 - 规划 Agent：qwen-plus + "你是旅行规划师"提示词 → 输出任务清单
-- 执行 Agent：不调用 LLM，纯工具调度（asyncio 并发调用高德 MCP + 天气）
+- 执行 Agent：不调用 LLM，纯工具调度（asyncio 并发调用高德 + 天气）
 - 审查 Agent：qwen-plus + "你是行程审查官"提示词 → 生成行程 + 5 维打分
 
-**可选进阶（面试可提）**：规划/审查分别用 qwen-max（更强推理）/ qwen-plus（成本低）做多模型分工。本项目默认"单模型多角色"，面试讲取舍：多角色提示词分工 = 成本低、逻辑一致；多模型分工 = 质量高、成本高——中小项目选前者，讲得出来就是加分。
+**可选进阶**：规划/审查分别用 qwen-max（更强推理）/ qwen-plus（成本低）做多模型分工。默认"单模型多角色"：成本低、逻辑一致；多模型分工质量更高但成本更高。
 
 ---
 
@@ -87,7 +86,7 @@
 └──────┬──────────┬──────────┬────────┬────────┘
        │          │          │        │
        ▼          ▼          ▼        ▼
-  高德 MCP    天气服务   PostgreSQL   Redis
+   高德 API    天气服务   PostgreSQL   Redis
   (POI/路线)  (天气)   (pgvector)  (偏好)
 ```
 
@@ -108,11 +107,11 @@
 ```
 User → FastAPI(/api/chat SSE) → LangGraph 图
   → 规划节点：LLM 将需求拆成任务列表
-      [{tool: amap_poi, arg: {city, keyword}}, {tool: amap_route, ...}, {tool: weather, ...}]
+      [{tool: amap_poi, args: {city, keyword}}, {tool: amap_route, ...}, {tool: weather, ...}]
   → 执行节点：asyncio.gather 并发执行工具，收集结果
       amap_poi → 候选景点列表（含评分/门票/位置）
       weather → 每日天气
-  → RAG 节点：候选景点名 → pgvector 检索攻略知识库 → 补充游玩建议/避坑信息
+  → RAG 节点：候选景点名 → pgvector 混合检索攻略知识库 → 补充游玩建议/避坑信息
   → 审查节点：LLM 综合信息生成行程（含时间/交通/预算），按 5 维打分
   → 打分 < 阈值：条件边回环 → 规划节点重新调整 → 再次执行
   → 打分达标：行程 JSON 写入 PG(trips)，SSE 推回前端
@@ -139,8 +138,8 @@ class TripState(TypedDict):
 | 节点 | 职责 | 输入 → 输出 | 关键实现 |
 |---|---|---|---|
 | 规划节点 planner | 需求→任务拆解 | user_input+feedback → tasks | LLM 结构化输出工具调用清单；重试时携带 feedback 修正 |
-| 执行节点 executor | 工具调度 | tasks → tool_results | asyncio.gather 并发；MCP 客户端调用；超时/降级 |
-| RAG 节点 retriever | 知识增强 | tool_results → rag_hints | 景点名提取 → embedding → pgvector topK 检索 → 注入提示词 |
+| 执行节点 executor | 工具调度 | tasks → tool_results | asyncio.gather 并发；超时/降级 |
+| RAG 节点 retriever | 知识增强 | tool_results → rag_hints | 查询改写 → 混合检索（dense 余弦 + sparse 关键词，RRF） |
 | 审查节点 reviewer | 行程生成+评分 | 汇总 → trip_plan+score | LLM 生成行程 + 结构化评分；输出不达标原因 |
 
 ### 5.3 边与回环
@@ -174,15 +173,15 @@ START → planner → executor → retriever → reviewer → END
       results = await asyncio.gather(*[call_tool(t) for t in tasks])
       return {"tool_results": dict(zip([t["tool"] for t in tasks], results))}
   ```
-- MCP 客户端（amap_mcp.py）：通过 MCP SDK 或 HTTP 调用高德开放平台：
-  - POI 搜索：/v3/place/text（关键词 → 景点候选：名称/坐标/评分/门票）
-  - 路线规划：/v3/direction/driving（或步行/公交，按偏好选）
-  - 周边查询：/v3/place/around
+- 高德工具（amap.py）：
+  - POI 搜索：`/v3/place/text`（关键词 → 景点候选：名称/坐标/评分/门票）
+  - 路线规划：`/v3/direction/driving`（或步行/公交，按偏好选）
+  - 周边查询：`/v3/place/around`
 - 天气工具（weather.py）：城市天气 API，返回逐日天气，供行程适配（雨天调室内景点）
 
 ### 6.3 RAG 节点（rag.py）—— 查询改写 + 混合检索（两层）
 
-**动机**：用户 query 口语化、候选景点是专有名词，单路向量检索两头都不讨好——语义漂、精确词丢。故采用两层：先用 LLM 把 query 改写成"检索友好"的多路查询，再走**混合检索**（dense 余弦 + sparse 关键词，RRF 融合）。不引入 cross-encoder rerank（库小、收益低于延迟成本，见 2.2 取舍话术）。
+**动机**：用户 query 口语化、候选景点是专有名词，单路向量检索两头都不讨好——语义漂、精确词丢。故采用两层：先用 LLM 把 query 改写成"检索友好"的多路查询，再走**混合检索**（dense 余弦 + sparse 关键词，RRF 融合）。不引入 cross-encoder rerank（库小、收益低于延迟成本）。
 
 ```
 tool_results（候选景点/城市/需求）
@@ -287,7 +286,7 @@ async def retriever_node(state: TripState) -> dict:
     # ① 改写
     rw = await rewrite(user_input, spots, city)
 
-    # ② 混合检索并发（复用项目"asyncio 并发"卖点）
+    # ② 混合检索并发（复用 asyncio 并发）
     dense_ids, sparse_ids = await asyncio.gather(
         dense_search(rw["dense_queries"]),
         sparse_search(rw["keywords"]),
@@ -299,9 +298,9 @@ async def retriever_node(state: TripState) -> dict:
     return {"rag_hints": hints}
 ```
 
-#### 6.3.4 知识库构建（离线脚本 · 微调）
+#### 6.3.4 知识库构建（离线脚本）
 
-保留原方案（512 字符 / 50 重叠 / text-embedding-v3 1024 维）。`content ILIKE` 可直接支撑 sparse，无需额外列：
+512 字符 / 50 重叠 / text-embedding-v3 1024 维。`content ILIKE` 可直接支撑 sparse，无需额外列：
 
 ```sql
 CREATE TABLE docs (
@@ -312,17 +311,6 @@ CREATE TABLE docs (
 );
 CREATE INDEX ON docs USING hnsw (embedding vector_cosine_ops);
 ```
-
-#### 6.3.5 测试用例（test_rag.py，配合第 10 节）
-
-| 用例 | 覆盖 | 断言 |
-|---|---|---|
-| test_rewrite_json_format | 改写层结构 | mock LLM 返回合法 JSON → 字段/条数符合约定（dense≤3, keywords≤6） |
-| test_rewrite_fallback | 改写降级 | LLM 抛异常/返回非法 JSON → 回退原始 query，不抛错 |
-| test_dense_search_cosine | 向量召回 | mock embed + mock DB → 走余弦 SQL、多 query 去重合并 |
-| test_sparse_search_hits | 关键词召回 | 命中数降序、空关键词容错 |
-| test_rrf_fusion_order | 融合排序 | 给定固定 dense/sparse 序列 → RRF 输出顺序正确 |
-| test_retriever_node_e2e | 节点全链路 | 全 mock → `state["rag_hints"]` 非空且长度 ≤ topK |
 
 ### 6.4 审查节点（reviewer.py）
 - LLM 生成行程 JSON：
@@ -381,10 +369,10 @@ CREATE INDEX ON docs USING hnsw (embedding vector_cosine_ops);
 
 ## 8. API 设计
 
-### 8.1 POST /api/chat（SSE 流式）
-请求：
-```json
-{"session_id": "s1", "message": "帮我规划上海两日游，预算1000，不爱走路"}
+### 8.1 GET /api/chat（SSE 流式）
+请求（query）：
+```
+/api/chat?session_id=s1&message=帮我规划上海两日游，预算1000，不爱走路
 ```
 SSE 事件序列：
 ```
@@ -455,7 +443,7 @@ frontend/
 | 合计 | | ~25 |
 
 - mock 策略：工具/LLM 全部 mock（不烧 Token、可回归）
-- 核心逻辑全部可回归验证（工具/LLM mock，不烧 Token）
+- 核心逻辑全部可回归验证
 
 ---
 
@@ -473,19 +461,3 @@ services:
     ports: ["6379:6379"]
 volumes: { pgdata: {} }
 ```
-
-
-
-## 12. 开发计划（4 天）
-
-| 天 | 任务 | 验收标准 |
-|---|---|---|
-| D1 | LangGraph 官方 tutorial（半天）；图骨架（4 节点占位）；FastAPI 入口 + SSE | /api/chat 能返回空流程事件 |
-| D2 | 高德 MCP 客户端（POI/路线/周边）；天气工具；asyncio 并发；docker-compose 起 PG+Redis | 工具调用返回真实数据 |
-| D3 | pgvector 建表 + 知识库构建脚本；RAG 检索；Redis 记忆；Vue 前端工程（Vite）+ 对话页流式展示 | 端到端能规划出带 RAG 提示的行程 |
-| D4 | 审查评分 + 条件回环；行程卡片 + 地图组件（Vue）；pytest ~25 用例；简历定稿 | 全链路可演示 + 测试全绿 |
-
----
-
-
-
