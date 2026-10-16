@@ -14,7 +14,7 @@
 | 工具 | 高德（POI / 路线 / 周边）+ 天气服务 |
 | 向量库 | PostgreSQL + pgvector |
 | 缓存 / 记忆 | Redis |
-| 前端 | 原生 HTML/JS + 高德 JS API |
+| 前端 | Vue 3 + Vite + 高德 JS API |
 | 测试 | pytest + httpx |
 | 部署 | docker-compose（PG + Redis） |
 
