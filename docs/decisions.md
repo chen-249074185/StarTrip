@@ -38,6 +38,13 @@
 - 放弃：Qdrant（独立服务，一库两用收益低）
 - 影响：一库两用，减少运维；中文 sparse 用 `ILIKE` 命中（后续可升级 zhparser）
 
+## D6 · LLM：DeepSeek ds-4.1-flash（Embedding 仍用 DashScope）
+- 日期：2026-10-16
+- 背景：需要便宜且支持 Function Calling 的对话模型；RAG 向量另需 embedding
+- 决定：LLM 用 DeepSeek `ds-4.1-flash`；Embedding 保持 DashScope `text-embedding-v3`（1024 维）
+- 放弃：全用 DashScope qwen-plus（成本更高）、LLM 与 Embedding 全用 DeepSeek（无合适 embedding）
+- 影响：LLM 与 Embedding 解耦、各自选型；DeepSeek OpenAI 兼容，接入简单
+
 ---
 
 ## 模板

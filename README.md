@@ -10,7 +10,8 @@
 |---|---|
 | Web 框架 | FastAPI（SSE 流式） |
 | Agent 编排 | LangGraph（状态图 + 条件回环） |
-| LLM / Embedding | 通义千问 qwen-plus / text-embedding-v3（DashScope） |
+| LLM | DeepSeek ds-4.1-flash |
+| Embedding | text-embedding-v3（DashScope，1024 维） |
 | 工具 | 高德（POI / 路线 / 周边）+ 天气服务 |
 | 向量库 | PostgreSQL + pgvector |
 | 缓存 / 记忆 | Redis |

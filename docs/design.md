@@ -30,7 +30,7 @@
 |---|---|---|
 | Web 框架 | FastAPI | Python 异步首选、原生 SSE 支持、pydantic 校验 |
 | Agent 编排 | LangGraph | 官方图式编排框架，状态管理 + 条件边 + 回环 |
-| LLM | DashScope（通义千问） | Function Calling 成熟、生态完善 |
+| LLM | DeepSeek ds-4.1-flash | 便宜、OpenAI 兼容、Function Calling 成熟 |
 | 工具 | 高德（POI/路线/周边）+ 天气服务 | 真实业务工具编排 |
 | 向量库 | PostgreSQL + pgvector | 生产级"一库两用"（业务数据 + 向量） |
 | 缓存/记忆 | Redis | 偏好缓存 + TTL |
@@ -42,19 +42,19 @@
 
 | 用途 | 模型 | 说明 |
 |---|---|---|
-| LLM（规划/审查节点） | 通义千问 qwen-plus（DashScope） | 需求→任务拆解（Function Calling 输出 JSON 工具清单）；行程生成 + 5 维评分；回环时携带 feedback 修正 |
-| Embedding（RAG） | text-embedding-v3（DashScope） | 攻略文档/查询向量化（1024 维），供 pgvector 余弦检索 |
+| LLM（规划/审查节点） | DeepSeek ds-4.1-flash | 需求→任务拆解（Function Calling 输出 JSON 工具清单）；行程生成 + 5 维评分；回环时携带 feedback 修正 |
+| Embedding（RAG） | text-embedding-v3（DashScope） | 攻略文档/查询向量化（1024 维），供 pgvector 余弦检索；与 LLM 解耦，独立选用 |
 | 执行节点 | 非 LLM（纯工具调度） | asyncio + 高德/天气 API 直接调用，无需 LLM 推理 |
 
 ### 2.2 多 Agent 设计说明
 
-**多 Agent 不是"多个大模型"，而是"多个角色节点"**——由同一个 LLM（qwen-plus）通过不同 System Prompt 扮演不同角色驱动：
+**多 Agent 不是"多个大模型"，而是"多个角色节点"**——由同一个 LLM（ds-4.1-flash）通过不同 System Prompt 扮演不同角色驱动：
 
-- 规划 Agent：qwen-plus + "你是旅行规划师"提示词 → 输出任务清单
+- 规划 Agent：ds-4.1-flash + "你是旅行规划师"提示词 → 输出任务清单
 - 执行 Agent：不调用 LLM，纯工具调度（asyncio 并发调用高德 + 天气）
-- 审查 Agent：qwen-plus + "你是行程审查官"提示词 → 生成行程 + 5 维打分
+- 审查 Agent：ds-4.1-flash + "你是行程审查官"提示词 → 生成行程 + 5 维打分
 
-**可选进阶**：规划/审查分别用 qwen-max（更强推理）/ qwen-plus（成本低）做多模型分工。默认"单模型多角色"：成本低、逻辑一致；多模型分工质量更高但成本更高。
+**可选进阶**：规划/审查分别用更强模型 / ds-4.1-flash 做多模型分工。默认"单模型多角色"：成本低、逻辑一致；多模型分工质量更高但成本更高。
 
 ---
 
@@ -186,7 +186,7 @@ START → planner → executor → retriever → reviewer → END
 ```
 tool_results（候选景点/城市/需求）
    │
-   ① Query Rewrite（qwen-plus）→ {dense_queries:[...], keywords:[...]}
+   ① Query Rewrite（ds-4.1-flash）→ {dense_queries:[...], keywords:[...]}
    │
    ② Hybrid Retrieval ─┬─ Dense：embedding → pgvector 余弦 (<=>) topN
    │                   └─ Sparse：关键词命中 topN
