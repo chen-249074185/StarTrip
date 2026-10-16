@@ -20,8 +20,8 @@
 - 多轮对话记忆（Redis 偏好跨轮复用）
 - Web 端实时交互（FastAPI SSE 流式输出 + Vue 3 前端 + 高德 JS API 地图可视化）
 
-### 1.3 与星链智核的关系
-将星链智核的"旅游功能"抽离，用 Python 全新技术栈（LangGraph + FastAPI + pgvector）重写升级，是独立的新项目，不是搬运。
+### 1.3 项目定位
+独立设计并实现的多 Agent 应用，采用 Python 现代技术栈（LangGraph + FastAPI + pgvector），覆盖"编排 + 工具 + RAG + 评测"完整链路。
 
 ---
 
@@ -151,7 +151,7 @@ START → planner → executor → retriever → reviewer → END
                      score ≥ 阈值 或 retry ≥ 3 → END（输出当前最优）
 ```
 - 条件边：reviewer 后判断 score
-- 防死循环：retry_count 上限 3 次（对应星链智核"步数上限"思想）
+- 防死循环：retry_count 上限 3 次（步数上限思想，避免无效重试烧 Token）
 
 ---
 
@@ -342,7 +342,7 @@ CREATE INDEX ON docs USING hnsw (embedding vector_cosine_ops);
 
 ### 6.5 记忆模块（memory.py）
 - Redis 结构：`prefs:{session_id}` → hash（口味/交通偏好/已排除景点）
-- TTL：30 分钟活跃会话 / 7 天长期（复用星链智核 TTL 口径）
+- TTL：30 分钟活跃会话 / 7 天长期
 - 规划节点提示词注入历史偏好；用户否定某景点时自动记录"排除项"
 
 ---
@@ -455,7 +455,7 @@ frontend/
 | 合计 | | ~25 |
 
 - mock 策略：工具/LLM 全部 mock（不烧 Token、可回归）
-- 与星链智核同思想：核心逻辑可回归验证
+- 核心逻辑全部可回归验证（工具/LLM mock，不烧 Token）
 
 ---
 
