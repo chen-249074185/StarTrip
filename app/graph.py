@@ -1,27 +1,13 @@
 from langgraph.graph import END, START, StateGraph
 
 from app.nodes.executor import executor
+from app.nodes.planner import planner
 from app.nodes.retriever import retriever
+from app.nodes.reviewer import reviewer
 from app.state import TripState
 
 SCORE_THRESHOLD = 80   # 评分达标线
 MAX_RETRY = 3          # 回环上限
-
-
-# ===== 节点（占位实现，后续替换为真实逻辑）=====
-
-async def planner(state: TripState) -> dict:
-    """规划节点：需求 → 任务拆解（占位）。"""
-    retry = state.get("retry_count", 0) + 1
-    return {
-        "tasks": [{"tool": "maps_text_search", "args": {"city": "上海", "keywords": "必去景点"}}],
-        "retry_count": retry,
-    }
-
-
-async def reviewer(state: TripState) -> dict:
-    """审查节点：生成行程 + 评分（占位）。"""
-    return {"trip_plan": {"days": []}, "score": 90.0, "feedback": None}
 
 
 # ===== 条件边 =====
