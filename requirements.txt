@@ -1,0 +1,37 @@
+# Web
+fastapi
+uvicorn[standard]
+pydantic-settings
+
+# Agent 编排
+langgraph
+langgraph-checkpoint-postgres
+langchain-core
+
+# LLM / Embedding
+openai            # DeepSeek（OpenAI 兼容）
+dashscope         # text-embedding-v3
+
+# 工具协议
+mcp               # MCP 客户端（高德 amap-maps）
+
+# 存储
+psycopg[binary]
+pgvector
+redis
+
+# 容错
+tenacity
+
+# 可观测
+opentelemetry-sdk
+opentelemetry-exporter-otlp
+
+# 鉴权
+python-jose[cryptography]
+
+# 测试 / 质量
+pytest
+pytest-asyncio
+httpx
+ruff
