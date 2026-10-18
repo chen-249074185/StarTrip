@@ -1,4 +1,5 @@
 import json
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.responses import StreamingResponse
@@ -6,8 +7,16 @@ from pydantic import BaseModel
 
 from app.config import settings
 from app.graph import graph
+from app.tools import close_amap
 
-app = FastAPI(title="StarTrip Agent", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    yield
+    await close_amap()   # 应用关闭时释放 MCP 会话
+
+
+app = FastAPI(title="StarTrip Agent", version="0.1.0", lifespan=lifespan)
 
 # 节点名 → SSE 阶段提示
 STAGE_MAP = {

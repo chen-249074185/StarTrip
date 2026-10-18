@@ -1,5 +1,6 @@
 from langgraph.graph import END, START, StateGraph
 
+from app.nodes.executor import executor
 from app.state import TripState
 
 SCORE_THRESHOLD = 80   # 评分达标线
@@ -15,11 +16,6 @@ async def planner(state: TripState) -> dict:
         "tasks": [{"tool": "maps_text_search", "args": {"city": "上海", "keywords": "必去景点"}}],
         "retry_count": retry,
     }
-
-
-async def executor(state: TripState) -> dict:
-    """执行节点：asyncio 并发调 MCP 工具（占位）。"""
-    return {"tool_results": {"maps_text_search": [{"name": "外滩"}]}}
 
 
 async def retriever(state: TripState) -> dict:

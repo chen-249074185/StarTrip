@@ -1,0 +1,52 @@
+"""执行节点：并发调度工具并收集结果。
+
+- `asyncio.gather(return_exceptions=True)`：单工具失败不拖垮整节点
+- 每工具超时：`asyncio.wait_for`
+- 同名工具结果聚合为列表（防覆盖）
+- 工具未注册 / 调用失败 / 超时 → 记为 {"error": ...}（降级，不抛断）
+"""
+
+from __future__ import annotations
+
+import asyncio
+from typing import Any
+
+from app.state import TripState
+from app.tools import get_tool
+
+TOOL_TIMEOUT = 8.0
+
+
+async def call_tool_safe(step: dict) -> Any:
+    """调用单个工具，带超时与异常兜底。"""
+    name = step.get("tool")
+    args = step.get("args") or {}
+    fn = get_tool(name) if name else None
+    if fn is None:
+        return {"error": f"未注册的工具: {name}"}
+    try:
+        return await asyncio.wait_for(fn(args), timeout=TOOL_TIMEOUT)
+    except TimeoutError:
+        return {"error": f"工具超时({TOOL_TIMEOUT}s): {name}"}
+    except Exception as e:  # noqa: BLE001
+        return {"error": f"工具失败 {name}: {e}"}
+
+
+async def executor(state: TripState) -> dict:
+    """并发执行 tasks，按工具名聚合结果。"""
+    plan = state.get("tasks", [])
+    if not plan:
+        return {"tool_results": {}}
+
+    results = await asyncio.gather(
+        *[call_tool_safe(step) for step in plan],
+        return_exceptions=True,
+    )
+
+    grouped: dict[str, list] = {}
+    for step, r in zip(plan, results):
+        name = step.get("tool", "unknown")
+        if isinstance(r, BaseException):
+            r = {"error": str(r)}
+        grouped.setdefault(name, []).append(r)
+    return {"tool_results": grouped}
