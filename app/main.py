@@ -1,4 +1,3 @@
-import asyncio
 import json
 
 from fastapi import FastAPI
@@ -6,8 +5,17 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from app.config import settings
+from app.graph import graph
 
 app = FastAPI(title="StarTrip Agent", version="0.1.0")
+
+# 节点名 → SSE 阶段提示
+STAGE_MAP = {
+    "planner": ("planning", "正在拆解任务..."),
+    "executor": ("executing", "正在搜索景点（高德）..."),
+    "retriever": ("rag", "正在检索攻略知识库..."),
+    "reviewer": ("reviewing", "正在审查行程..."),
+}
 
 
 class ChatRequest(BaseModel):
@@ -34,19 +42,28 @@ async def health() -> dict:
 
 @app.post("/api/chat")
 async def chat(req: ChatRequest) -> StreamingResponse:
-    """SSE 占位流：先推固定阶段事件，后续接入 LangGraph 图。"""
+    """SSE 流：跑 LangGraph 图，把节点事件转成 progress，最后推 result。"""
 
     async def event_stream():
-        stages = [
-            ("planning", "正在拆解任务..."),
-            ("executing", "正在搜索景点（高德）..."),
-            ("rag", "正在检索攻略知识库..."),
-            ("reviewing", "正在审查行程..."),
-        ]
-        for stage, msg in stages:
-            yield sse("progress", {"stage": stage, "msg": msg})
-            await asyncio.sleep(0.3)
-        yield sse("result", {"trip_plan": {}, "score": None})
-        yield sse("done", {})
+        state_in = {"user_input": req.message, "session_id": req.session_id}
+        config = {"configurable": {"thread_id": req.session_id}}
+        final: dict = {}
+        try:
+            async for ev in graph.astream_events(state_in, config, version="v2"):
+                name = ev.get("name")
+                if name not in STAGE_MAP:
+                    continue
+                if ev["event"] == "on_chain_start":
+                    stage, msg = STAGE_MAP[name]
+                    yield sse("progress", {"stage": stage, "msg": msg})
+                elif ev["event"] == "on_chain_end":
+                    out = ev["data"].get("output")
+                    if isinstance(out, dict):
+                        final.update(out)
+            yield sse("result", {"trip_plan": final.get("trip_plan"), "score": final.get("score")})
+            yield sse("done", {})
+        except Exception as e:  # noqa: BLE001
+            yield sse("error", {"code": 500, "msg": str(e)})
+            yield sse("done", {})
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
