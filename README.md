@@ -12,7 +12,7 @@
 | Agent 编排 | LangGraph（状态图 + 条件回环） |
 | LLM | DeepSeek ds-4.1-flash |
 | Embedding | text-embedding-v3（DashScope，1024 维） |
-| 工具 | 高德（POI / 路线 / 周边）+ 天气服务 |
+| 工具 | 高德 MCP（POI / 路线 / 周边）+ 天气服务 |
 | 向量库 | PostgreSQL + pgvector |
 | 缓存 / 记忆 | Redis |
 | 前端 | Vue 3 + Vite + 高德 JS API |

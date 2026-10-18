@@ -40,6 +40,11 @@ uploads/
 # ===== 本地记录（不公开）=====
 docs/DEVLOG.md
 docs/StarTrip_v2_方案.md
+docs/private/
+notes/
+*面试*
+*简历*
+*.local.md
 
 # ===== 系统 =====
 Thumbs.db
