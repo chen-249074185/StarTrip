@@ -15,6 +15,8 @@ class Settings(BaseSettings):
 
     # ===== LLM / Embedding =====
     deepseek_api_key: str = ""
+    deepseek_base_url: str = "https://api.deepseek.com"
+    deepseek_model: str = "deepseek-chat"
     dashscope_api_key: str = ""
 
     # ===== 高德（后端 Web 服务 key + 前端 JS key）=====
