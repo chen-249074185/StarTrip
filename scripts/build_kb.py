@@ -59,5 +59,5 @@ async def main(kb_dir: Path) -> None:
 
 
 if __name__ == "__main__":
-    arg = sys.argv[1] if len(sys.argv) > 1 else "data/kb"
+    arg = sys.argv[1] if len(sys.argv) > 1 else "kb"
     asyncio.run(main(Path(arg)))
