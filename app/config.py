@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     # ===== Redis =====
     redis_url: str = "redis://localhost:6379/0"
 
+    # ===== RAG =====
+    rag_sim_threshold: float = 0.6   # dense 检索余弦相似度阈值（低于则丢弃，防无关资料注入）
+
     # ===== JWT 鉴权 =====
     jwt_secret: str = ""
 

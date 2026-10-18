@@ -26,13 +26,33 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(title="StarTrip Agent", version="0.1.0", lifespan=lifespan)
 
-# 节点名 → SSE 阶段提示
-STAGE_MAP = {
+# 节点名 → (SSE 阶段, 开始提示)
+NODE_STAGE = {
     "planner": ("planning", "正在拆解任务..."),
     "executor": ("executing", "正在搜索景点（高德）..."),
     "retriever": ("rag", "正在检索攻略知识库..."),
     "reviewer": ("reviewing", "正在审查行程..."),
 }
+
+
+def node_summary(name: str, out: dict) -> dict:
+    """把节点产出压成一句可展示的摘要，让前端看得出"这一步成功没有"。"""
+    if name == "planner":
+        tasks = out.get("tasks", [])
+        tools = "、".join(t.get("tool", "?") for t in tasks) or "（空）"
+        return {"msg": f"任务拆解完成：{tools}", "tasks": tasks}
+    if name == "executor":
+        return {"msg": f"工具执行完成：{len(out.get('tool_results', {}))} 类结果"}
+    if name == "retriever":
+        return {"msg": f"检索到 {len(out.get('rag_hints', []))} 条攻略"}
+    if name == "reviewer":
+        score = out.get("score")
+        fb = out.get("feedback")
+        msg = f"评分 {score}"
+        if fb:
+            msg += f"（未达标，重新规划：{fb}）"
+        return {"msg": msg, "score": score, "feedback": fb}
+    return {}
 
 
 class ChatRequest(BaseModel):
@@ -57,6 +77,19 @@ async def health() -> dict:
     }
 
 
+@app.get("/api/config")
+async def config() -> dict:
+    """下发前端需要的公开配置（高德 JS key / 安全码）。"""
+    return {
+        "code": 0,
+        "msg": "ok",
+        "data": {
+            "amap_js_key": settings.amap_js_key,
+            "amap_js_security_code": settings.amap_js_security_code,
+        },
+    }
+
+
 @app.post("/api/chat")
 async def chat(req: ChatRequest) -> StreamingResponse:
     """SSE 流：跑 LangGraph 图，把节点事件转成 progress，最后推 result。"""
@@ -68,15 +101,16 @@ async def chat(req: ChatRequest) -> StreamingResponse:
         try:
             async for ev in graph.astream_events(state_in, config, version="v2"):
                 name = ev.get("name")
-                if name not in STAGE_MAP:
+                if name not in NODE_STAGE:
                     continue
+                stage, start_msg = NODE_STAGE[name]
                 if ev["event"] == "on_chain_start":
-                    stage, msg = STAGE_MAP[name]
-                    yield sse("progress", {"stage": stage, "msg": msg})
+                    yield sse("progress", {"stage": stage, "msg": start_msg})
                 elif ev["event"] == "on_chain_end":
                     out = ev["data"].get("output")
                     if isinstance(out, dict):
                         final.update(out)
+                        yield sse("node", {"node": name, "stage": stage, **node_summary(name, out)})
             yield sse("result", {"trip_plan": final.get("trip_plan"), "score": final.get("score")})
             yield sse("done", {})
         except Exception as e:  # noqa: BLE001

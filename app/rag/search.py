@@ -4,13 +4,15 @@ from __future__ import annotations
 
 from pgvector import Vector
 
+from app.config import settings
 from app.db.pg import fetch
 from app.llm import embed
 
-# dense：余弦距离 <=>（越小越近）
+# dense：余弦距离 <=>（越小越近）；只保留相似度 >= 阈值的结果
 DENSE_SQL = """
 SELECT id, content
 FROM docs
+WHERE 1 - (embedding <=> %s) >= %s
 ORDER BY embedding <=> %s
 LIMIT %s
 """
@@ -27,11 +29,13 @@ def _build_sparse_sql(n: int) -> str:
 
 
 async def dense_search(queries: list[str], topn: int = 20) -> list[int]:
-    """多路 query 各召回，保序去重合并。"""
+    """多路 query 各召回（相似度低于阈值丢弃），保序去重合并。"""
     ids: list[int] = []
+    thr = settings.rag_sim_threshold
     for q in queries:
         [emb] = await embed([q])
-        rows = await fetch(DENSE_SQL, (Vector(emb), topn))
+        vec = Vector(emb)
+        rows = await fetch(DENSE_SQL, (vec, thr, vec, topn))
         ids.extend(r["id"] for r in rows)
     return list(dict.fromkeys(ids))
 
