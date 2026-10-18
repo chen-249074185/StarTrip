@@ -1,6 +1,7 @@
 from langgraph.graph import END, START, StateGraph
 
 from app.nodes.executor import executor
+from app.nodes.retriever import retriever
 from app.state import TripState
 
 SCORE_THRESHOLD = 80   # 评分达标线
@@ -16,11 +17,6 @@ async def planner(state: TripState) -> dict:
         "tasks": [{"tool": "maps_text_search", "args": {"city": "上海", "keywords": "必去景点"}}],
         "retry_count": retry,
     }
-
-
-async def retriever(state: TripState) -> dict:
-    """RAG 节点：查询改写 + 混合检索（占位）。"""
-    return {"rag_hints": ["早上去外滩可避人流"]}
 
 
 async def reviewer(state: TripState) -> dict:
