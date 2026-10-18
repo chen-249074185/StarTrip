@@ -38,6 +38,7 @@ function submit() {
 .msg { margin: 6px 0; padding: 8px 10px; border-radius: 8px; max-width: 82%; white-space: pre-wrap; }
 .msg.user { background: #d6e4ff; margin-left: auto; }
 .msg.bot { background: #f0f0f0; }
+.msg.detail { background: #f7faf7; color: #3a7a52; font-size: 12.5px; border-left: 3px solid #5aa87a; }
 .input { display: flex; gap: 8px; padding: 10px; border-top: 1px solid #eee; }
 .input input { flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 6px; }
 .input button { padding: 8px 14px; border: none; background: #2c3e50; color: #fff; border-radius: 6px; cursor: pointer; }
