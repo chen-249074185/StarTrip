@@ -43,14 +43,17 @@ async def main(kb_dir: Path) -> None:
 
     total = 0
     for f in files:
-        chunks = chunk_text(f.read_text(encoding="utf-8"))
+        text = f.read_text(encoding="utf-8")
+        # title 取首行标题去掉 # 与"旅游攻略"，即中文城市名（如 北京）
+        title = text.splitlines()[0].lstrip("# ").replace("旅游攻略", "").strip() or f.stem
+        chunks = chunk_text(text)
         if not chunks:
             continue
         embs = await embed(chunks)
         for chunk, e in zip(chunks, embs):
             await execute(
                 "INSERT INTO docs (title, content, source, embedding) VALUES (%s, %s, %s, %s)",
-                (f.stem, chunk, str(f), Vector(e)),
+                (title, chunk, str(f), Vector(e)),
             )
             total += 1
         print(f"{f.name}: {len(chunks)} chunks")

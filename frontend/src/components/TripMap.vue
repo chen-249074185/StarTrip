@@ -72,6 +72,7 @@ async function render() {
 
 onMounted(render)
 watch(() => props.spotCoords, render, { deep: true })
+watch(() => props.amapKey, render)
 onUnmounted(() => {
   if (map) {
     map.destroy()

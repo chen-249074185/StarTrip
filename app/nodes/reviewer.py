@@ -15,6 +15,7 @@ REVIEWER_PROMPT = """你是行程审查官。根据用户需求、工具结果�
      "transport": "...", "budget": 0, "note": "..."}], "budget_total": 0}]},
   "score": 0-100,
   "dimensions": {"时间衔接": 0, "距离合理性": 0, "偏好匹配": 0, "预算控制": 0, "天气适配": 0},
+  "reply": "给用户的一句自然语言总结（如：给你安排了上海两日游，D1 外滩…，综合评分 88 分）",
   "feedback": "若不达标，指出哪条失分（达标则空字符串）"
 }
 注意：攻略知识（RAG）是**可选补充**，若与目的地无关或缺失，请直接忽略，**不要因此扣分**；
@@ -38,7 +39,8 @@ async def reviewer(state: TripState) -> dict:
         return {
             "trip_plan": data.get("trip_plan") or {"days": []},
             "score": float(data.get("score") or 0),
+            "reply": data.get("reply") or "",
             "feedback": data.get("feedback") or None,
         }
     except Exception:  # noqa: BLE001
-        return {"trip_plan": {"days": []}, "score": 0.0, "feedback": "生成失败，请重试"}
+        return {"trip_plan": {"days": []}, "score": 0.0, "reply": "", "feedback": "生成失败，请重试"}

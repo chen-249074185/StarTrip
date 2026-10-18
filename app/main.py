@@ -28,6 +28,9 @@ app = FastAPI(title="StarTrip Agent", version="0.1.0", lifespan=lifespan)
 
 # 节点名 → (SSE 阶段, 开始提示)
 NODE_STAGE = {
+    "router": ("routing", "正在判断意图..."),
+    "chat": ("chatting", "正在回复..."),
+    "recommend": ("recommending", "正在挑选目的地..."),
     "planner": ("planning", "正在拆解任务..."),
     "executor": ("executing", "正在搜索景点（高德）..."),
     "retriever": ("rag", "正在检索攻略知识库..."),
@@ -37,6 +40,13 @@ NODE_STAGE = {
 
 def node_summary(name: str, out: dict) -> dict:
     """把节点产出压成一句可展示的摘要，让前端看得出"这一步成功没有"。"""
+    if name == "router":
+        city = out.get("city") or ""
+        return {"msg": f"意图：{out.get('intent')}" + (f"（目的地：{city}）" if city else "")}
+    if name == "recommend":
+        return {"msg": f"推荐了 {len(out.get('options', []))} 个目的地"}
+    if name == "chat":
+        return {"msg": "已回复"}
     if name == "planner":
         tasks = out.get("tasks", [])
         tools = "、".join(t.get("tool", "?") for t in tasks) or "（空）"
@@ -111,7 +121,12 @@ async def chat(req: ChatRequest) -> StreamingResponse:
                     if isinstance(out, dict):
                         final.update(out)
                         yield sse("node", {"node": name, "stage": stage, **node_summary(name, out)})
-            yield sse("result", {"trip_plan": final.get("trip_plan"), "score": final.get("score")})
+            yield sse("result", {
+                "trip_plan": final.get("trip_plan"),
+                "score": final.get("score"),
+                "reply": final.get("reply"),
+                "options": final.get("options"),
+            })
             yield sse("done", {})
         except Exception as e:  # noqa: BLE001
             yield sse("error", {"code": 500, "msg": str(e)})

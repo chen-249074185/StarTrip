@@ -10,6 +10,7 @@ import { useSSE } from './composables/useSSE'
 const messages = ref([])
 const tripPlan = ref(null)
 const score = ref(null)
+const options = ref([])
 const loading = ref(false)
 const amapKey = ref('')
 const securityCode = ref('')
@@ -48,6 +49,7 @@ async function onSend(text) {
   loading.value = true
   tripPlan.value = null
   score.value = null
+  options.value = []
   spotCoords.value = {}
   const push = (t) => messages.value.push({ role: 'bot', text: t })
 
@@ -61,7 +63,9 @@ async function onSend(text) {
         else if (ev.event === 'result') {
           tripPlan.value = ev.data.trip_plan
           score.value = ev.data.score
-          resolveCoords()
+          if (ev.data.reply) push(ev.data.reply)
+          options.value = ev.data.options || []
+          if (tripPlan.value) resolveCoords()
         } else if (ev.event === 'error') push('出错: ' + (ev.data.msg || ''))
       },
     })
@@ -78,7 +82,7 @@ async function onSend(text) {
     <header>StarTrip · 多 Agent 旅行规划</header>
     <main>
       <section class="left">
-        <ChatPanel :messages="messages" :loading="loading" @send="onSend" />
+        <ChatPanel :messages="messages" :loading="loading" :options="options" @send="onSend" />
       </section>
       <section class="right">
         <template v-if="tripPlan">

@@ -9,7 +9,9 @@ class TripState(TypedDict, total=False):
 
     # ===== 输入 =====
     user_input: str              # 原始需求
-    intent: str                  # 路由判定：chat / clarify / plan
+    intent: str                  # 路由判定：recommend / plan
+    city: str                    # 目的地（router 抽取，空则走推荐）
+    season: str                  # 当前季节（入口按日期计算）
     history: list[dict]          # 多轮对话历史（经摘要压缩）
     session_id: str              # 会话 ID（= checkpoint thread_id）
 
@@ -29,3 +31,7 @@ class TripState(TypedDict, total=False):
 
     # ===== 控制 =====
     retry_count: int             # 回环已用次数，上限 3
+
+    # ===== 回复 =====
+    reply: str | None            # 助手自然语言回复
+    options: list[dict]          # 可点选建议 [{label, value}]
