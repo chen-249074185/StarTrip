@@ -6,14 +6,21 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from app.config import settings
+from app.db.pg import close_pool, init_schema, open_pool
 from app.graph import graph
 from app.tools import close_amap
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    try:
+        open_pool()
+        await init_schema()
+    except Exception as e:  # noqa: BLE001
+        print(f"[startup] PG 未就绪，跳过初始化: {e}")
     yield
-    await close_amap()   # 应用关闭时释放 MCP 会话
+    await close_amap()   # 释放 MCP 会话
+    close_pool()
 
 
 app = FastAPI(title="StarTrip Agent", version="0.1.0", lifespan=lifespan)

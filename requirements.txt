@@ -16,7 +16,7 @@ dashscope         # text-embedding-v3
 mcp               # MCP 客户端（高德 amap-maps）
 
 # 存储
-psycopg[binary]
+psycopg[binary,pool]
 pgvector
 redis
 
