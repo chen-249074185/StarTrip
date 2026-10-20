@@ -33,6 +33,18 @@ DOCS_DDL = [
     "CREATE INDEX IF NOT EXISTS docs_embedding_hnsw ON docs USING hnsw (embedding vector_cosine_ops)",
 ]
 
+# 用户表（JWT 鉴权）
+USERS_DDL = [
+    """
+    CREATE TABLE IF NOT EXISTS users (
+      id            BIGSERIAL PRIMARY KEY,
+      username      TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      created_at    TIMESTAMPTZ DEFAULT now()
+    )
+    """,
+]
+
 
 def get_pool() -> ConnectionPool:
     """惰性创建同步连接池。"""
@@ -62,7 +74,7 @@ def close_pool() -> None:
 
 def _init_schema_sync() -> None:
     with get_pool().connection() as conn:
-        for stmt in DOCS_DDL:
+        for stmt in [*DOCS_DDL, *USERS_DDL]:
             conn.execute(stmt)
 
 

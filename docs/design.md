@@ -436,6 +436,7 @@ event: done       data: {}
 - 依赖注入 `get_current_user` 解析 JWT → `user_id`；`session_id` 归属该用户，防越权读取他人行程/偏好
 - 密钥 `JWT_SECRET`（`.env`），HS256 签名，access token 有效期 2h
 - 无 token 的公开接口：`/health`；其余一律 401
+- **当前落地**：`app/auth.py`（stdlib scrypt 密码哈希 + HS256 JWT + `get_current_user`）、`users` 表、`POST /api/auth/login`、`GET /api/auth/me`；`thread_id = {user_id}:{session_id}` 做 Checkpoint 隔离；`AUTH_ENABLED=false` 默认兼容 demo。暂未做 refresh token / 登录限流。
 
 ---
 

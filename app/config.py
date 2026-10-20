@@ -60,7 +60,9 @@ class Settings(BaseSettings):
     otel_insecure: bool = True
 
     # ===== JWT 鉴权 =====
+    auth_enabled: bool = False
     jwt_secret: str = ""
+    jwt_expire_minutes: int = 120
 
 
 @lru_cache

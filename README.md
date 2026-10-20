@@ -61,6 +61,24 @@ Invoke-RestMethod http://localhost:8000/health
 - 可观测：`OTEL_ENABLED=true`，Jaeger UI `http://localhost:16686`
 - 离线评测：`docker compose exec -T app python -m scripts.run_eval --limit 3`
 
+## 鉴权（可选）
+
+默认 `AUTH_ENABLED=false`，不改变原有 demo 行为。开启：
+
+```powershell
+# .env
+AUTH_ENABLED=true
+JWT_SECRET=<随机长字符串>
+
+# 创建/重置用户（本地）
+python -m scripts.create_user admin
+
+# Docker
+docker compose exec -T app python -m scripts.create_user admin
+```
+
+开启后前端会显示登录页；`/api/chat`、`/api/resume` 需要 `Authorization: Bearer <JWT>`，Checkpoint 按 `user_id:session_id` 隔离。token 默认 120 分钟过期。
+
 ## 目录结构
 
 ```
@@ -78,4 +96,4 @@ StarTrip/
 
 ## 状态
 
-M0~M8 已完成：多 Agent 编排、工具、RAG、审查回环、Vue 前端、可靠性四件套、Checkpoint/多轮记忆、HITL、OTel 可观测、LLM-as-judge 离线评测。持续补测试与部署细节。
+M0~M8 已完成：多 Agent 编排、工具、RAG、审查回环、Vue 前端、可靠性四件套、Checkpoint/多轮记忆、HITL、OTel 可观测、LLM-as-judge 离线评测、Docker 部署；JWT 鉴权已实现（可选开启）。

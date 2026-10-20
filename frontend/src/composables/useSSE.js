@@ -16,13 +16,19 @@ function parseBlock(block) {
   }
 }
 
-async function postSSE(url, body, onEvent) {
+async function postSSE(url, body, onEvent, token) {
+  const headers = { 'Content-Type': 'application/json' }
+  if (token) headers.Authorization = `Bearer ${token}`
   const resp = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify(body),
   })
-  if (!resp.ok || !resp.body) throw new Error('请求失败: ' + resp.status)
+  if (!resp.ok || !resp.body) {
+    const err = new Error('请求失败: ' + resp.status)
+    err.status = resp.status
+    throw err
+  }
 
   const reader = resp.body.getReader()
   const decoder = new TextDecoder()
@@ -41,12 +47,12 @@ async function postSSE(url, body, onEvent) {
 }
 
 export function useSSE() {
-  function streamChat({ sessionId, message, onEvent }) {
-    return postSSE('/api/chat', { session_id: sessionId, message }, onEvent)
+  function streamChat({ sessionId, message, token, onEvent }) {
+    return postSSE('/api/chat', { session_id: sessionId, message }, onEvent, token)
   }
 
-  function resumeChat({ sessionId, tasks, onEvent }) {
-    return postSSE('/api/resume', { session_id: sessionId, tasks }, onEvent)
+  function resumeChat({ sessionId, tasks, token, onEvent }) {
+    return postSSE('/api/resume', { session_id: sessionId, tasks }, onEvent, token)
   }
 
   return { streamChat, resumeChat }

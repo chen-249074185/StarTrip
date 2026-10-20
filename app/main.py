@@ -2,13 +2,19 @@
 import json
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 from langgraph.types import Command
 from opentelemetry.trace import Span, Status, StatusCode
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 import app.graph as graph_module
+from app.auth import (
+    authenticate_user,
+    create_access_token,
+    get_current_user,
+    thread_id_for,
+)
 from app.config import settings
 from app.db.checkpoint import init_checkpointer
 from app.db.pg import close_pool, init_schema, open_pool
@@ -25,6 +31,8 @@ from app.tools import close_amap
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    if settings.auth_enabled and not settings.jwt_secret:
+        raise RuntimeError("AUTH_ENABLED=true 但 JWT_SECRET 未配置")
     tracing = setup_tracing()
     print(f"[startup] OTel tracing: {'on' if tracing else 'off'}")
     try:
@@ -83,13 +91,18 @@ def node_summary(name: str, out: dict) -> dict:
 
 
 class ChatRequest(BaseModel):
-    session_id: str
+    session_id: str = Field(min_length=1, max_length=128)
     message: str
 
 
 class ResumeRequest(BaseModel):
-    session_id: str
+    session_id: str = Field(min_length=1, max_length=128)
     tasks: list[dict] | None = None
+
+
+class LoginRequest(BaseModel):
+    username: str = Field(min_length=1, max_length=64)
+    password: str = Field(min_length=1, max_length=256)
 
 
 def sse(event: str, data: dict) -> str:
@@ -209,6 +222,7 @@ async def health() -> dict:
         "mcp": "unknown",
         "checkpoint": graph_module.checkpointer_kind(),
         "tracing": "on" if tracing_enabled() else "off",
+        "auth": "on" if settings.auth_enabled else "off",
         "breakers": breaker_snapshot(),
     }
 
@@ -222,21 +236,62 @@ async def config() -> dict:
         "data": {
             "amap_js_key": settings.amap_js_key,
             "amap_js_security_code": settings.amap_js_security_code,
+            "auth_enabled": settings.auth_enabled,
         },
     }
 
 
+@app.post("/api/auth/login")
+async def login(req: LoginRequest) -> dict:
+    """用户名/密码换 JWT。"""
+    if not settings.auth_enabled:
+        raise HTTPException(400, "未启用鉴权")
+    user = await authenticate_user(req.username, req.password)
+    if user is None:
+        raise HTTPException(401, "用户名或密码错误")
+    token = create_access_token(str(user["id"]))
+    return {
+        "code": 0,
+        "msg": "ok",
+        "data": {
+            "access_token": token,
+            "token_type": "bearer",
+            "username": user["username"],
+        },
+    }
+
+
+@app.get("/api/auth/me")
+async def me(user_id: str | None = Depends(get_current_user)) -> dict:
+    return {
+        "code": 0,
+        "msg": "ok",
+        "data": {"user_id": user_id, "auth_enabled": settings.auth_enabled},
+    }
+
+
 @app.post("/api/chat")
-async def chat(req: ChatRequest) -> StreamingResponse:
+async def chat(
+    req: ChatRequest,
+    user_id: str | None = Depends(get_current_user),
+) -> StreamingResponse:
     """SSE 流：跑 LangGraph 图，推 progress / node / interrupt / result。"""
-    state_in = {"user_input": req.message, "session_id": req.session_id}
-    config = {"configurable": {"thread_id": req.session_id}}
+    thread_id = thread_id_for(user_id, req.session_id)
+    state_in = {"user_input": req.message, "session_id": thread_id}
+    config = {"configurable": {"thread_id": thread_id}}
     return StreamingResponse(stream_graph(state_in, config), media_type="text/event-stream")
 
 
 @app.post("/api/resume")
-async def resume(req: ResumeRequest) -> StreamingResponse:
+async def resume(
+    req: ResumeRequest,
+    user_id: str | None = Depends(get_current_user),
+) -> StreamingResponse:
     """HITL 恢复：用确认/编辑后的任务清单继续跑同一 thread。"""
-    config = {"configurable": {"thread_id": req.session_id}}
+    thread_id = thread_id_for(user_id, req.session_id)
+    config = {"configurable": {"thread_id": thread_id}}
+    snapshot = await graph_module.graph.aget_state(config)
+    if interrupt_payload(snapshot) is None:
+        raise HTTPException(404, "没有待确认的任务")
     command = Command(resume={"tasks": req.tasks or []})
     return StreamingResponse(stream_graph(command, config), media_type="text/event-stream")

@@ -30,9 +30,9 @@ def _interrupt_snapshot(tasks: list[dict]) -> SimpleNamespace:
 
 
 class FakeGraph:
-    def __init__(self, events: list[dict], snapshot: SimpleNamespace):
+    def __init__(self, events: list[dict], snapshot):
         self.events = events
-        self.snapshot = snapshot
+        self.snapshots = snapshot if isinstance(snapshot, list) else [snapshot]
         self.inputs: list[tuple] = []
 
     async def astream_events(self, graph_input, config, version="v2"):
@@ -41,7 +41,9 @@ class FakeGraph:
             yield event
 
     async def aget_state(self, config):
-        return self.snapshot
+        if len(self.snapshots) > 1:
+            return self.snapshots.pop(0)
+        return self.snapshots[0]
 
 
 class BoomGraph:
@@ -133,9 +135,9 @@ async def test_chat_sse_interrupt(monkeypatch):
 
 
 async def test_resume_passes_tasks(monkeypatch):
-    fake = FakeGraph(NORMAL_EVENTS[4:], _snapshot())
-    monkeypatch.setattr(main_mod.graph_module, "graph", fake)
     tasks = [{"tool": "maps_weather", "args": {"city": "上海"}}]
+    fake = FakeGraph(NORMAL_EVENTS[4:], [_interrupt_snapshot(tasks), _snapshot()])
+    monkeypatch.setattr(main_mod.graph_module, "graph", fake)
 
     resp = await post("/api/resume", {"session_id": "s3", "tasks": tasks})
     events = parse_sse(resp.text)
@@ -145,6 +147,12 @@ async def test_resume_passes_tasks(monkeypatch):
     graph_input = fake.inputs[0][0]
     assert isinstance(graph_input, Command)
     assert graph_input.resume["tasks"] == tasks
+
+
+async def test_resume_without_pending_interrupt(monkeypatch):
+    monkeypatch.setattr(main_mod.graph_module, "graph", FakeGraph([], _snapshot()))
+    resp = await post("/api/resume", {"session_id": "s6", "tasks": []})
+    assert resp.status_code == 404
 
 
 async def test_chat_error_event(monkeypatch):
@@ -159,7 +167,17 @@ async def test_health_and_config():
     health = await get("/health")
     assert health.status_code == 200
     body = health.json()
-    for key in ("status", "pg", "redis", "llm", "mcp", "checkpoint", "tracing", "breakers"):
+    for key in (
+        "status",
+        "pg",
+        "redis",
+        "llm",
+        "mcp",
+        "checkpoint",
+        "tracing",
+        "auth",
+        "breakers",
+    ):
         assert key in body
 
     config = await get("/api/config")
@@ -168,6 +186,7 @@ async def test_health_and_config():
     assert data["code"] == 0
     assert "amap_js_key" in data["data"]
     assert "amap_js_security_code" in data["data"]
+    assert "auth_enabled" in data["data"]
 
 
 @pytest.mark.parametrize(

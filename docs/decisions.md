@@ -122,6 +122,13 @@
 - 放弃：代码内裸跑 DDL（不可回滚、多环境漂移）
 - 影响：`alembic upgrade head` 一键建/改表
 
+## D18 · 鉴权：JWT + 用户表 + session 命名空间
+- 日期：2026-10-20
+- 背景：接口契约写了 Bearer，但没有实现；客户端 session_id 可被猜到，Checkpoint 可能越权读取
+- 决定：HS256 JWT（`sub=user_id`，2h）+ `users` 表 + scrypt 密码哈希；`thread_id = {user_id}:{session_id}`；`AUTH_ENABLED` 控制开关，默认关闭
+- 放弃：Session Cookie（跨域/CSRF 复杂）、纯前端校验（可绕过）、引入 OAuth（demo 过重）
+- 影响：开启后 chat/resume 必须带 token；session 天然按用户隔离；refresh token / 登录限流后续再补
+
 ---
 
 ## 模板
