@@ -9,6 +9,11 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d startrip"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
 
   redis:
     image: redis:7
@@ -22,6 +27,34 @@ services:
     ports:
       - "16686:16686"   # UI
       - "4317:4317"     # OTLP gRPC
+
+  app:
+    build:
+      context: .
+    environment:
+      DATABASE_URL: postgresql://user:pass@postgres:5432/startrip
+      REDIS_URL: redis://redis:6379/0
+      OTEL_ENDPOINT: http://jaeger:4317
+      OTEL_ENABLED: ${OTEL_ENABLED:-false}
+      HITL_ENABLED: ${HITL_ENABLED:-true}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
+      AMAP_KEY: ${AMAP_KEY:-}
+      AMAP_JS_KEY: ${AMAP_JS_KEY:-}
+      AMAP_JS_SECURITY_CODE: ${AMAP_JS_SECURITY_CODE:-}
+      JWT_SECRET: ${JWT_SECRET:-}
+    env_file:
+      - path: .env
+        required: false
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      jaeger:
+        condition: service_started
 
 volumes:
   pgdata: {}

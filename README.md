@@ -16,8 +16,10 @@
 | 向量库 | PostgreSQL + pgvector |
 | 缓存 / 记忆 | Redis |
 | 前端 | Vue 3 + Vite + 高德 JS API |
+| 可观测 | OpenTelemetry + Jaeger |
+| 评测 | 独立 LLM-as-judge + golden set |
 | 测试 | pytest + httpx |
-| 部署 | docker-compose（PG + Redis） |
+| 部署 | docker-compose（PG + Redis + Jaeger + app） |
 
 ## 快速开始
 
@@ -37,6 +39,28 @@ docker compose up -d
 uvicorn app.main:app --reload
 ```
 
+## Docker 部署
+
+```powershell
+# 1. 配置密钥（compose 会自动读取 .env）
+Copy-Item .env.example .env   # 填 DEEPSEEK_API_KEY / DASHSCOPE_API_KEY / AMAP_KEY 等
+
+# 2. 起全部服务（PostgreSQL + Redis + Jaeger + app）
+docker compose up -d --build
+
+# 3. 健康检查
+Invoke-RestMethod http://localhost:8000/health
+```
+
+- 首次部署需构建知识库（容器内执行）：
+  ```powershell
+  docker compose exec -T app python -m scripts.build_kb
+  ```
+- 前端仍需单独启动：`cd frontend; npm run dev`（或 `npm run build` 后托管 `dist/`）
+- HITL 默认开启；全自动规划可设 `HITL_ENABLED=false`
+- 可观测：`OTEL_ENABLED=true`，Jaeger UI `http://localhost:16686`
+- 离线评测：`docker compose exec -T app python -m scripts.run_eval --limit 3`
+
 ## 目录结构
 
 ```
@@ -54,4 +78,4 @@ StarTrip/
 
 ## 状态
 
-开发中。
+M0~M8 已完成：多 Agent 编排、工具、RAG、审查回环、Vue 前端、可靠性四件套、Checkpoint/多轮记忆、HITL、OTel 可观测、LLM-as-judge 离线评测。持续补测试与部署细节。
