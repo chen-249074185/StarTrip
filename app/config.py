@@ -56,6 +56,9 @@ class Settings(BaseSettings):
     # ===== 行程持久化 =====
     trip_persist_enabled: bool = True
 
+    # ===== Redis 偏好 =====
+    pref_ttl_seconds: int = 7 * 24 * 3600
+
     # ===== 可观测（OTel / Jaeger）=====
     otel_enabled: bool = False
     otel_service_name: str = "startrip-agent"

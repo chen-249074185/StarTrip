@@ -79,6 +79,15 @@ docker compose exec -T app python -m scripts.create_user admin
 
 开启后前端会显示登录页；`/api/chat`、`/api/resume` 需要 `Authorization: Bearer <JWT>`，Checkpoint 按 `user_id:session_id` 隔离。token 默认 120 分钟过期。
 
+## 偏好（Redis）
+
+```powershell
+POST /api/prefs   {"session_id":"s1","prefs":{"budget":1000,"must_avoid":["博物馆"]}}
+GET  /api/prefs?session_id=s1
+```
+
+偏好按 `prefs:{thread_id}` 存 Redis，默认 7 天 TTL；planner/reviewer/recommend 会自动注入。Redis 不可用时 GET 返回空、POST 返回 503，不阻断主流程。
+
 ## 目录结构
 
 ```
@@ -96,4 +105,4 @@ StarTrip/
 
 ## 状态
 
-M0~M8 已完成：多 Agent 编排、工具、RAG、审查回环、Vue 前端、可靠性四件套、Checkpoint/多轮记忆、HITL、OTel 可观测、LLM-as-judge 离线评测、Docker 部署；JWT 鉴权与行程落库（`/api/trips`）已实现。
+M0~M8 已完成：多 Agent 编排、工具、RAG、审查回环、Vue 前端、可靠性四件套、Checkpoint/多轮记忆、HITL、OTel 可观测、LLM-as-judge 离线评测、Docker 部署；JWT 鉴权、行程落库（`/api/trips`）与 Redis 偏好（`/api/prefs`）已实现。

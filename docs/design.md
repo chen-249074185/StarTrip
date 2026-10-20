@@ -364,6 +364,7 @@ CREATE INDEX ON docs USING hnsw (embedding vector_cosine_ops);
 - Redis 结构：`prefs:{session_id}` → hash（口味/交通偏好/已排除景点）
 - TTL：30 分钟活跃会话 / 7 天长期
 - 规划节点提示词注入历史偏好；用户否定某景点时自动记录"排除项"
+- **当前落地**：`prefs:{thread_id}` → JSON 字符串，TTL 7 天；Pydantic 校验；`POST /api/prefs` 增量合并；planner / reviewer / recommend 注入；Redis 不可用时降级为空偏好。自动抽取偏好留作后续。
 
 ---
 
@@ -655,6 +656,7 @@ graph.astream_events(Command(resume={"tasks": edited}), config, version="v2")
 - **语义缓存**：query embedding 与缓存项余弦相似度 > 0.95 → 直接返回历史行程（Redis，TTL 1h）；embedding 结果也缓存，省 embedding 调用。
 - **降级数据源**：MCP/天气失败 → 回退本地种子 JSON（热门城市 POI 快照）或上次缓存结果；天气维度失败则该维度不参与评分（而非整体失败）。
 - 命中缓存/降级时在响应标注 `degraded: true`，便于观测与用户知情。
+- **当前落地**：已做 Redis 偏好存储（`prefs:{thread_id}`，7 天 TTL，Redis 挂掉降级为空）；工具结果缓存 / 语义缓存暂缓。
 
 ### 12.10 护栏与安全
 

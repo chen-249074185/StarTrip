@@ -18,6 +18,7 @@ from app.auth import (
 from app.config import settings
 from app.db.checkpoint import init_checkpointer
 from app.db.pg import close_pool, init_schema, open_pool
+from app.db.redis import close_redis, init_redis, redis_ready
 from app.db.trips import get_trip, list_trips
 from app.observability import (
     get_tracer,
@@ -26,6 +27,7 @@ from app.observability import (
     shutdown_tracing,
     tracing_enabled,
 )
+from app.prefs import Prefs, get_prefs, save_prefs
 from app.resilience import breaker_snapshot
 from app.tools import close_amap
 
@@ -44,8 +46,11 @@ async def lifespan(_: FastAPI):
         print("[startup] Checkpoint 已启用（PostgresSaver）")
     except Exception as e:  # noqa: BLE001
         print(f"[startup] PG 未就绪，降级为内存 Checkpoint: {e}")
+    redis_client = await init_redis()
+    print(f"[startup] Redis: {'on' if redis_client else 'off'}")
     yield
     await close_amap()   # 释放 MCP 会话
+    await close_redis()
     close_pool()
     shutdown_tracing()
 
@@ -104,6 +109,11 @@ class ResumeRequest(BaseModel):
 class LoginRequest(BaseModel):
     username: str = Field(min_length=1, max_length=64)
     password: str = Field(min_length=1, max_length=256)
+
+
+class PrefsRequest(BaseModel):
+    session_id: str = Field(min_length=1, max_length=128)
+    prefs: Prefs
 
 
 def sse(event: str, data: dict) -> str:
@@ -220,7 +230,7 @@ async def health() -> dict:
     return {
         "status": "ok",
         "pg": "unknown",
-        "redis": "unknown",
+        "redis": "ok" if redis_ready() else "down",
         "llm": "ok" if settings.deepseek_api_key else "unconfigured",
         "mcp": "unknown",
         "checkpoint": graph_module.checkpointer_kind(),
@@ -270,6 +280,36 @@ async def me(user_id: str | None = Depends(get_current_user)) -> dict:
         "code": 0,
         "msg": "ok",
         "data": {"user_id": user_id, "auth_enabled": settings.auth_enabled},
+    }
+
+
+@app.get("/api/prefs")
+async def read_prefs(
+    session_id: str = Query(min_length=1, max_length=128),
+    user_id: str | None = Depends(get_current_user),
+) -> dict:
+    """读取当前会话偏好；Redis 不可用时返回空偏好（降级）。"""
+    thread_id = thread_id_for(user_id, session_id)
+    return {"code": 0, "msg": "ok", "data": {"prefs": await get_prefs(thread_id)}}
+
+
+@app.post("/api/prefs")
+async def update_prefs(
+    req: PrefsRequest,
+    user_id: str | None = Depends(get_current_user),
+) -> dict:
+    """增量更新偏好（只覆盖传入的非空字段）。"""
+    thread_id = thread_id_for(user_id, req.session_id)
+    ok = await save_prefs(
+        thread_id,
+        req.prefs.model_dump(exclude_none=True, exclude_unset=True),
+    )
+    if not ok:
+        raise HTTPException(503, "偏好存储不可用")
+    return {
+        "code": 0,
+        "msg": "ok",
+        "data": {"prefs": await get_prefs(thread_id)},
     }
 
 

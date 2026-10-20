@@ -6,6 +6,7 @@ import json
 
 from app.llm import chat
 from app.memory import prior_history
+from app.prefs import format_prefs, get_prefs
 from app.state import TripState
 
 REVIEWER_PROMPT = """你是行程审查官。根据用户需求、工具结果与攻略知识，生成完整行程并评分。
@@ -31,9 +32,11 @@ async def reviewer(state: TripState) -> dict:
     rag_hints = state.get("rag_hints", [])
 
     prior = prior_history(state.get("history") or [])
+    pref_text = format_prefs(await get_prefs(state.get("session_id", "")))
     msg = (
         (f"最近对话:\n{prior}\n\n" if prior else "")
         + f"用户需求:{user_input}\n"
+        + (f"已知偏好:{pref_text}\n" if pref_text else "")
         + f"工具结果:{json.dumps(tool_results, ensure_ascii=False)[:4000]}\n"
         + f"攻略知识:{rag_hints}"
     )

@@ -11,6 +11,7 @@ import json
 
 from app.llm import chat
 from app.memory import prior_history
+from app.prefs import format_prefs, get_prefs
 from app.state import TripState
 
 PLANNER_PROMPT = """你是旅行规划任务拆解器。根据用户需求，输出要调用的工具任务清单 JSON：
@@ -42,6 +43,9 @@ async def planner(state: TripState) -> dict:
     msg = f"用户需求:{user_input}"
     if city:
         msg += f"\n目的地:{city}"
+    pref_text = format_prefs(await get_prefs(state.get("session_id", "")))
+    if pref_text:
+        msg += f"\n已知偏好:{pref_text}"
     prior = prior_history(state.get("history") or [])
     if prior:
         msg = f"最近对话:\n{prior}\n\n{msg}"

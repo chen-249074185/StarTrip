@@ -129,6 +129,13 @@
 - 放弃：Session Cookie（跨域/CSRF 复杂）、纯前端校验（可绕过）、引入 OAuth（demo 过重）
 - 影响：开启后 chat/resume 必须带 token；session 天然按用户隔离；refresh token / 登录限流后续再补
 
+## D19 · 偏好存储：Redis JSON + 7 天 TTL
+- 日期：2026-10-20
+- 背景：多轮偏好需要跨请求复用，但不值得进 PG 主表/Checkpoint
+- 决定：`prefs:{thread_id}` 存 JSON 字符串（budget/days/pace/transport/interests/must_include/must_avoid/notes），TTL 7 天；`POST /api/prefs` 增量合并；planner/reviewer/recommend 注入
+- 放弃：存 PG prefs 表（可做，但 Redis TTL 更贴合短生命周期）、塞进 Checkpoint（跨会话不可用）、自动 LLM 抽取偏好（多一次调用，后续再做）
+- 影响：Redis 不可用时降级为空偏好，不阻断主流程；key 用 `thread_id`，天然按用户隔离
+
 ---
 
 ## 模板

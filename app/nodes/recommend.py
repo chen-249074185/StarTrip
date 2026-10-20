@@ -8,6 +8,7 @@ import random
 from app.db.pg import fetch
 from app.llm import chat
 from app.memory import prior_history
+from app.prefs import format_prefs, get_prefs
 from app.state import TripState
 
 RECOMMEND_PROMPT = """你是旅行推荐官。根据用户的话和当前季节，从给定的「城市池」里挑 5-6 个当季适合的目的地。
@@ -36,6 +37,9 @@ async def recommend(state: TripState) -> dict:
     prior = prior_history(state.get("history") or [])
     if prior:
         msg = f"最近对话:\n{prior}\n\n{msg}"
+    pref_text = format_prefs(await get_prefs(state.get("session_id", "")))
+    if pref_text:
+        msg += f"\n已知偏好:{pref_text}"
     try:
         raw = await chat(RECOMMEND_PROMPT, msg, response_format="json_object", temperature=0.9)
         data = json.loads(raw)
