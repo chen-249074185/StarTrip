@@ -604,6 +604,7 @@ async def llm_chat(...): ...
   - `retry_count`、`circuit_state`、`score`、`eval_*`
 - **结构化日志**：JSON 格式，`request_id` + `thread_id` 贯穿全链路，便于按会话聚合。
 - 实现：LangChain `callback` handler 或 OTel span 包住节点函数；指标可选 Prometheus `/metrics`。
+- **当前落地**：`OTEL_ENABLED=true` 时导出到 Jaeger（`OTEL_ENDPOINT`，默认 `http://localhost:4317`）。span 结构：`chat.request` / `chat.resume` → `node.<name>`；LLM 调用 `llm.chat`（含 input/output/total tokens）、`llm.embed`；工具调用 `tool.<name>`（ok/timeout/circuit_open/error）。`/health` 返回 `tracing` 状态。
 
 ### 12.6 评测回归（eval harness）
 

@@ -12,6 +12,7 @@ import asyncio
 from typing import Any
 
 from app.config import settings
+from app.observability import get_tracer
 from app.resilience import CircuitOpenError, call_resilient
 from app.state import TripState
 from app.tools import get_tool
@@ -28,8 +29,10 @@ async def call_tool_safe(step: dict) -> Any:
     async def _call() -> Any:
         return await fn(args)
 
+    span = get_tracer().start_span(f"tool.{name}")
+    span.set_attribute("tool.name", name)
     try:
-        return await call_resilient(
+        result = await call_resilient(
             f"tool:{name}",
             _call,
             timeout=settings.tool_timeout,
@@ -37,12 +40,20 @@ async def call_tool_safe(step: dict) -> Any:
             failure_threshold=settings.breaker_failure_threshold,
             reset_timeout=settings.breaker_reset_timeout,
         )
+        span.set_attribute("tool.status", "ok")
+        return result
     except CircuitOpenError:
+        span.set_attribute("tool.status", "circuit_open")
         return {"error": f"工具熔断中: {name}"}
     except TimeoutError:
+        span.set_attribute("tool.status", "timeout")
         return {"error": f"工具超时({settings.tool_timeout}s): {name}"}
     except Exception as e:  # noqa: BLE001
+        span.set_attribute("tool.status", "error")
+        span.record_exception(e)
         return {"error": f"工具失败 {name}: {e}"}
+    finally:
+        span.end()
 
 
 async def executor(state: TripState) -> dict:

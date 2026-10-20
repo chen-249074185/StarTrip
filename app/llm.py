@@ -12,8 +12,10 @@ from typing import Any
 import dashscope
 import httpx
 from openai import AsyncOpenAI
+from opentelemetry.trace import Status, StatusCode
 
 from app.config import settings
+from app.observability import get_tracer
 from app.resilience import TransientError, call_resilient
 
 EMBED_MODEL = "text-embedding-v3"
@@ -37,10 +39,34 @@ def _llm_client() -> AsyncOpenAI:
 
 
 async def _chat_once(model: str, messages: list[dict], kwargs: dict) -> str:
-    resp = await _llm_client().chat.completions.create(
-        model=model, messages=messages, **kwargs
-    )
-    return resp.choices[0].message.content or ""
+    with get_tracer().start_as_current_span("llm.chat") as span:
+        span.set_attribute("gen_ai.system", "deepseek")
+        span.set_attribute("gen_ai.request.model", model)
+        if "temperature" in kwargs:
+            span.set_attribute("gen_ai.request.temperature", float(kwargs["temperature"]))
+        try:
+            resp = await _llm_client().chat.completions.create(
+                model=model, messages=messages, **kwargs
+            )
+        except Exception as e:
+            span.record_exception(e)
+            span.set_status(Status(StatusCode.ERROR))
+            raise
+
+        usage = getattr(resp, "usage", None)
+        if usage is not None:
+            prompt_tokens = getattr(usage, "prompt_tokens", None)
+            completion_tokens = getattr(usage, "completion_tokens", None)
+            if prompt_tokens is not None:
+                span.set_attribute("gen_ai.usage.input_tokens", int(prompt_tokens))
+            if completion_tokens is not None:
+                span.set_attribute("gen_ai.usage.output_tokens", int(completion_tokens))
+            if prompt_tokens is not None and completion_tokens is not None:
+                span.set_attribute(
+                    "gen_ai.usage.total_tokens",
+                    int(prompt_tokens) + int(completion_tokens),
+                )
+        return resp.choices[0].message.content or ""
 
 
 async def chat(
@@ -121,11 +147,20 @@ async def embed(texts: list[str]) -> list[list[float]]:
     async def _call() -> list[list[float]]:
         return await asyncio.to_thread(_embed_sync, texts)
 
-    return await call_resilient(
-        "embedding:dashscope",
-        _call,
-        timeout=settings.embed_timeout,
-        attempts=settings.llm_max_retries,
-        failure_threshold=settings.breaker_failure_threshold,
-        reset_timeout=settings.breaker_reset_timeout,
-    )
+    with get_tracer().start_as_current_span("llm.embed") as span:
+        span.set_attribute("gen_ai.operation.name", "embeddings")
+        span.set_attribute("gen_ai.request.model", EMBED_MODEL)
+        span.set_attribute("embedding.batch_size", len(texts))
+        try:
+            return await call_resilient(
+                "embedding:dashscope",
+                _call,
+                timeout=settings.embed_timeout,
+                attempts=settings.llm_max_retries,
+                failure_threshold=settings.breaker_failure_threshold,
+                reset_timeout=settings.breaker_reset_timeout,
+            )
+        except Exception as e:
+            span.record_exception(e)
+            span.set_status(Status(StatusCode.ERROR))
+            raise

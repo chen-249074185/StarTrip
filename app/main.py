@@ -5,18 +5,28 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.responses import StreamingResponse
 from langgraph.types import Command
+from opentelemetry.trace import Span, Status, StatusCode
 from pydantic import BaseModel
 
 import app.graph as graph_module
 from app.config import settings
 from app.db.checkpoint import init_checkpointer
 from app.db.pg import close_pool, init_schema, open_pool
+from app.observability import (
+    get_tracer,
+    node_attributes,
+    setup_tracing,
+    shutdown_tracing,
+    tracing_enabled,
+)
 from app.resilience import breaker_snapshot
 from app.tools import close_amap
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    tracing = setup_tracing()
+    print(f"[startup] OTel tracing: {'on' if tracing else 'off'}")
     try:
         open_pool()
         await init_schema()
@@ -28,6 +38,7 @@ async def lifespan(_: FastAPI):
     yield
     await close_amap()   # 释放 MCP 会话
     close_pool()
+    shutdown_tracing()
 
 
 app = FastAPI(title="StarTrip Agent", version="0.1.0", lifespan=lifespan)
@@ -101,40 +112,90 @@ def interrupt_payload(snapshot) -> dict | None:
     return None
 
 
-async def stream_graph(graph_input, config: dict):
-    """跑图并转 SSE：有 interrupt 则暂停，否则推 result。"""
-    final: dict = {}
-    try:
-        async for ev in graph_module.graph.astream_events(
-            graph_input, config, version="v2"
-        ):
-            name = ev.get("name")
-            if name not in NODE_STAGE:
-                continue
-            stage, start_msg = NODE_STAGE[name]
-            if ev["event"] == "on_chain_start":
-                yield sse("progress", {"stage": stage, "msg": start_msg})
-            elif ev["event"] == "on_chain_end":
-                out = ev["data"].get("output")
-                if isinstance(out, dict):
-                    final.update(out)
-                    yield sse("node", {"node": name, "stage": stage, **node_summary(name, out)})
+TRACE_NODES = set(NODE_STAGE) | {"confirm", "remember"}
 
-        snapshot = await graph_module.graph.aget_state(config)
-        payload = interrupt_payload(snapshot)
-        if payload is not None:
-            yield sse("interrupt", payload)
-        else:
-            yield sse("result", {
-                "trip_plan": final.get("trip_plan"),
-                "score": final.get("score"),
-                "reply": final.get("reply"),
-                "options": final.get("options"),
-            })
-        yield sse("done", {})
-    except Exception as e:  # noqa: BLE001
-        yield sse("error", {"code": 500, "msg": str(e)})
-        yield sse("done", {})
+
+async def stream_graph(graph_input, config: dict):
+    """跑图并转 SSE：有 interrupt 则暂停，否则推 result；同时记录 OTel span。"""
+    final: dict = {}
+    thread_id = str(config.get("configurable", {}).get("thread_id", ""))
+    is_resume = isinstance(graph_input, Command)
+    tracer = get_tracer()
+    node_spans: dict[str, Span] = {}
+    interrupted = False
+
+    with tracer.start_as_current_span(
+        "chat.resume" if is_resume else "chat.request"
+    ) as span:
+        span.set_attribute("session.id", thread_id)
+        span.set_attribute("chat.is_resume", is_resume)
+        span.set_attribute("hitl.enabled", settings.hitl_enabled)
+        span.set_attribute("checkpoint.kind", graph_module.checkpointer_kind())
+        try:
+            async for ev in graph_module.graph.astream_events(
+                graph_input, config, version="v2"
+            ):
+                name = ev.get("name")
+                if name not in TRACE_NODES:
+                    continue
+
+                run_id = ev.get("run_id")
+                if run_id and ev["event"] == "on_chain_start":
+                    child = tracer.start_span(f"node.{name}")
+                    child.set_attribute("node.name", name)
+                    node_spans[run_id] = child
+                elif run_id and ev["event"] == "on_chain_end":
+                    child = node_spans.pop(run_id, None)
+                    out = ev["data"].get("output")
+                    if child is not None:
+                        if isinstance(out, dict):
+                            for key, value in node_attributes(name, out).items():
+                                child.set_attribute(key, value)
+                        child.set_attribute("node.status", "ok")
+                        child.end()
+
+                if name not in NODE_STAGE:
+                    continue
+                stage, start_msg = NODE_STAGE[name]
+                if ev["event"] == "on_chain_start":
+                    yield sse("progress", {"stage": stage, "msg": start_msg})
+                elif ev["event"] == "on_chain_end":
+                    out = ev["data"].get("output")
+                    if isinstance(out, dict):
+                        final.update(out)
+                        yield sse("node", {"node": name, "stage": stage, **node_summary(name, out)})
+
+            snapshot = await graph_module.graph.aget_state(config)
+            payload = interrupt_payload(snapshot)
+            if payload is not None:
+                interrupted = True
+                yield sse("interrupt", payload)
+            else:
+                score = final.get("score")
+                span.set_attribute(
+                    "run.score", float(score) if score is not None else 0.0
+                )
+                span.set_attribute("run.has_plan", bool(final.get("trip_plan")))
+                span.set_attribute("run.reply_length", len(final.get("reply") or ""))
+                yield sse("result", {
+                    "trip_plan": final.get("trip_plan"),
+                    "score": score,
+                    "reply": final.get("reply"),
+                    "options": final.get("options"),
+                })
+            yield sse("done", {})
+        except Exception as e:  # noqa: BLE001
+            span.record_exception(e)
+            span.set_status(Status(StatusCode.ERROR))
+            yield sse("error", {"code": 500, "msg": str(e)})
+            yield sse("done", {})
+        finally:
+            for child in node_spans.values():
+                child.set_attribute(
+                    "node.status", "interrupted" if interrupted else "incomplete"
+                )
+                child.end()
+            span.set_attribute("run.interrupted", interrupted)
 
 
 @app.get("/health")
@@ -147,6 +208,7 @@ async def health() -> dict:
         "llm": "ok" if settings.deepseek_api_key else "unconfigured",
         "mcp": "unknown",
         "checkpoint": graph_module.checkpointer_kind(),
+        "tracing": "on" if tracing_enabled() else "off",
         "breakers": breaker_snapshot(),
     }
 

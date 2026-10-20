@@ -53,6 +53,12 @@ class Settings(BaseSettings):
     # ===== HITL =====
     hitl_enabled: bool = True                # 执行前是否暂停，等待用户确认任务清单
 
+    # ===== 可观测（OTel / Jaeger）=====
+    otel_enabled: bool = False
+    otel_service_name: str = "startrip-agent"
+    otel_endpoint: str = "http://localhost:4317"
+    otel_insecure: bool = True
+
     # ===== JWT 鉴权 =====
     jwt_secret: str = ""
 
