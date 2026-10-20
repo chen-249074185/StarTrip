@@ -150,6 +150,7 @@ class TripState(TypedDict):
 |---|---|---|---|
 | 路由节点 router | 意图分流 | user_input → intent | 轻量 LLM 分类 chat/clarify/plan（§12.7） |
 | 规划节点 planner | 需求→任务拆解 | user_input+feedback → tasks | LLM 结构化输出工具调用清单；重试时携带 feedback 修正 |
+| 确认节点 confirm | 执行前人工确认 | tasks → tasks | `interrupt()` 暂停，`Command(resume=...)` 覆盖任务；回环不重复打断 |
 | 执行节点 executor | 工具调度 | tasks → tool_results | asyncio.gather 并发；超时/降级 |
 | RAG 节点 retriever | 知识增强 | tool_results → rag_hints | 查询改写 → 混合检索（dense 余弦 + sparse 关键词，RRF） |
 | 审查节点 reviewer | 行程生成+评分 | 汇总 → trip_plan+score | LLM 生成行程 + 结构化评分；输出不达标原因 |
@@ -158,7 +159,7 @@ class TripState(TypedDict):
 ### 5.3 边与回环
 ```
 START → router ──(chat/recommend)──→ chat/recommend → remember → END
-             └──(plan)→ planner → executor → retriever → reviewer ─┬→ remember → END
+             └──(plan)→ planner → confirm → executor → retriever → reviewer ─┬→ remember → END
                                    ↑_______________________________│
                       score < 80 且 retry_count < 3 → 回 planner（携带 feedback）
                       score ≥ 80 或 retry_count ≥ 3 → remember → END（输出当前最优）
@@ -640,6 +641,7 @@ graph.astream_events(Command(resume={"tasks": edited}), config, version="v2")
 
 - 依赖 checkpointer（§12.1）持久化暂停态；`thread_id` 定位。
 - SSE 新增 `interrupt` 事件（§8.1）；前端渲染任务清单，用户改完 POST `/api/resume`。
+- **当前落地**：`HITL_ENABLED`（默认 true）控制开关；`confirm` 节点在首次规划后暂停，前端可取消勾选任务，resume 时用选中项覆盖；回环重试不再打断。
 
 ### 12.9 缓存与降级数据源
 

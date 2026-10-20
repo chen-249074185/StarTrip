@@ -2,6 +2,7 @@ from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import END, START, StateGraph
 
 from app.nodes.chat_reply import chat_reply
+from app.nodes.confirm import confirm
 from app.nodes.executor import executor
 from app.nodes.planner import planner
 from app.nodes.recommend import recommend
@@ -44,6 +45,7 @@ def build_graph() -> StateGraph:
     g.add_node("chat", chat_reply)
     g.add_node("recommend", recommend)
     g.add_node("planner", planner)
+    g.add_node("confirm", confirm)
     g.add_node("executor", executor)
     g.add_node("retriever", retriever)
     g.add_node("reviewer", reviewer)
@@ -58,7 +60,8 @@ def build_graph() -> StateGraph:
     g.add_edge("chat", "remember")
     g.add_edge("recommend", "remember")
 
-    g.add_edge("planner", "executor")
+    g.add_edge("planner", "confirm")
+    g.add_edge("confirm", "executor")
     g.add_edge("executor", "retriever")
     g.add_edge("retriever", "reviewer")
     g.add_conditional_edges(

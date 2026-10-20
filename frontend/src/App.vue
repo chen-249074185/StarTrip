@@ -11,6 +11,7 @@ const messages = ref([])
 const tripPlan = ref(null)
 const score = ref(null)
 const options = ref([])
+const pendingTasks = ref(null)
 const loading = ref(false)
 const amapKey = ref('')
 const securityCode = ref('')
@@ -18,7 +19,7 @@ const spotCoords = ref({})
 const savedSession = sessionStorage.getItem('startrip_session')
 const sessionId = savedSession || 'web-' + Math.random().toString(36).slice(2, 8)
 if (!savedSession) sessionStorage.setItem('startrip_session', sessionId)
-const { streamChat } = useSSE()
+const { streamChat, resumeChat } = useSSE()
 
 onMounted(async () => {
   try {
@@ -46,31 +47,47 @@ async function resolveCoords() {
   }
 }
 
+const push = (t) => messages.value.push({ role: 'bot', text: t })
+
+function handleEvent(ev) {
+  if (ev.event === 'progress') push(ev.data.msg)
+  else if (ev.event === 'node') messages.value.push({ role: 'detail', text: ev.data.msg })
+  else if (ev.event === 'interrupt') {
+    pendingTasks.value = ev.data.tasks || []
+    push(ev.data.msg || '请确认任务清单')
+  } else if (ev.event === 'result') {
+    pendingTasks.value = null
+    tripPlan.value = ev.data.trip_plan
+    score.value = ev.data.score
+    if (ev.data.reply) push(ev.data.reply)
+    options.value = ev.data.options || []
+    if (tripPlan.value) resolveCoords()
+  } else if (ev.event === 'error') push('出错: ' + (ev.data.msg || ''))
+}
+
 async function onSend(text) {
   messages.value.push({ role: 'user', text })
   loading.value = true
+  pendingTasks.value = null
   tripPlan.value = null
   score.value = null
   options.value = []
   spotCoords.value = {}
-  const push = (t) => messages.value.push({ role: 'bot', text: t })
 
   try {
-    await streamChat({
-      sessionId,
-      message: text,
-      onEvent: (ev) => {
-        if (ev.event === 'progress') push(ev.data.msg)
-        else if (ev.event === 'node') messages.value.push({ role: 'detail', text: ev.data.msg })
-        else if (ev.event === 'result') {
-          tripPlan.value = ev.data.trip_plan
-          score.value = ev.data.score
-          if (ev.data.reply) push(ev.data.reply)
-          options.value = ev.data.options || []
-          if (tripPlan.value) resolveCoords()
-        } else if (ev.event === 'error') push('出错: ' + (ev.data.msg || ''))
-      },
-    })
+    await streamChat({ sessionId, message: text, onEvent: handleEvent })
+  } catch (e) {
+    push('请求失败: ' + e.message)
+  } finally {
+    loading.value = false
+  }
+}
+
+async function onResume(tasks) {
+  if (loading.value) return
+  loading.value = true
+  try {
+    await resumeChat({ sessionId, tasks, onEvent: handleEvent })
   } catch (e) {
     push('请求失败: ' + e.message)
   } finally {
@@ -84,7 +101,14 @@ async function onSend(text) {
     <header>StarTrip · 多 Agent 旅行规划</header>
     <main>
       <section class="left">
-        <ChatPanel :messages="messages" :loading="loading" :options="options" @send="onSend" />
+        <ChatPanel
+          :messages="messages"
+          :loading="loading"
+          :options="options"
+          :tasks="pendingTasks"
+          @send="onSend"
+          @resume="onResume"
+        />
       </section>
       <section class="right">
         <template v-if="tripPlan">

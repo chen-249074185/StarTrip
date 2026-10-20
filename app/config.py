@@ -50,6 +50,9 @@ class Settings(BaseSettings):
     breaker_failure_threshold: int = 5       # 连续失败多少次打开熔断
     breaker_reset_timeout: float = 30.0      # 打开后多少秒进入半开探测
 
+    # ===== HITL =====
+    hitl_enabled: bool = True                # 执行前是否暂停，等待用户确认任务清单
+
     # ===== JWT 鉴权 =====
     jwt_secret: str = ""
 

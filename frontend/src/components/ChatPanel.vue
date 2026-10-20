@@ -1,23 +1,43 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 
 const props = defineProps({
   messages: { type: Array, default: () => [] },
   loading: { type: Boolean, default: false },
   options: { type: Array, default: () => [] },
+  tasks: { type: Array, default: null },
 })
-const emit = defineEmits(['send'])
+const emit = defineEmits(['send', 'resume'])
 const input = ref('')
+const checked = ref([])
+
+watch(
+  () => props.tasks,
+  (tasks) => {
+    checked.value = (tasks || []).map(() => true)
+  },
+  { immediate: true },
+)
+
+function argsText(args) {
+  return JSON.stringify(args || {})
+}
+
+function confirmTasks() {
+  const picked = (props.tasks || []).filter((_, i) => checked.value[i])
+  if (!picked.length || props.loading) return
+  emit('resume', picked)
+}
 
 function submit() {
   const text = input.value.trim()
-  if (!text || props.loading) return
+  if (!text || props.loading || props.tasks) return
   emit('send', text)
   input.value = ''
 }
 
 function pick(o) {
-  if (props.loading) return
+  if (props.loading || props.tasks) return
   emit('send', o.value || o.label)
 }
 </script>
@@ -33,13 +53,25 @@ function pick(o) {
         <span v-if="o.desc">{{ o.desc }}</span>
       </button>
     </div>
+    <div v-if="tasks && tasks.length" class="confirm">
+      <div class="confirm-title">执行前确认任务清单（取消勾选可跳过）</div>
+      <label v-for="(t, i) in tasks" :key="i" class="task">
+        <input v-model="checked[i]" type="checkbox" />
+        <b>{{ t.tool }}</b>
+        <code>{{ argsText(t.args) }}</code>
+      </label>
+      <button class="confirm-btn" :disabled="loading || !checked.some(Boolean)" @click="confirmTasks">
+        {{ loading ? '执行中…' : '确认并开始' }}
+      </button>
+    </div>
     <div class="input">
       <input
         v-model="input"
-        placeholder="描述你的出行需求，例如：上海两日游，预算1000，不爱走路"
+        :disabled="!!tasks"
+        :placeholder="tasks ? '请先确认上方任务清单' : '描述你的出行需求，例如：上海两日游，预算1000，不爱走路'"
         @keyup.enter="submit"
       />
-      <button :disabled="loading" @click="submit">{{ loading ? '规划中…' : '发送' }}</button>
+      <button :disabled="loading || !!tasks" @click="submit">{{ loading ? '规划中…' : '发送' }}</button>
     </div>
   </div>
 </template>
@@ -57,6 +89,12 @@ function pick(o) {
   border-radius: 10px; cursor: pointer; font-size: 13px; }
 .opt:hover { background: #2c3e50; color: #fff; }
 .opt span { font-size: 11px; opacity: 0.7; }
+.confirm { margin: 6px 10px; padding: 10px; border: 1px solid #e0c36a; background: #fffbea; border-radius: 8px; }
+.confirm-title { font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+.task { display: flex; align-items: center; gap: 6px; font-size: 12.5px; margin: 4px 0; }
+.task code { color: #777; font-size: 11.5px; word-break: break-all; }
+.confirm-btn { margin-top: 8px; padding: 6px 12px; border: none; background: #b7791f; color: #fff; border-radius: 6px; cursor: pointer; }
+.confirm-btn:disabled { opacity: 0.55; cursor: default; }
 .input { display: flex; gap: 8px; padding: 10px; border-top: 1px solid #eee; }
 .input input { flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 6px; }
 .input button { padding: 8px 14px; border: none; background: #2c3e50; color: #fff; border-radius: 6px; cursor: pointer; }

@@ -16,30 +16,38 @@ function parseBlock(block) {
   }
 }
 
-export function useSSE() {
-  async function streamChat({ sessionId, message, onEvent }) {
-    const resp = await fetch('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ session_id: sessionId, message }),
-    })
-    if (!resp.ok || !resp.body) throw new Error('请求失败: ' + resp.status)
+async function postSSE(url, body, onEvent) {
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!resp.ok || !resp.body) throw new Error('请求失败: ' + resp.status)
 
-    const reader = resp.body.getReader()
-    const decoder = new TextDecoder()
-    let buffer = ''
-    for (;;) {
-      const { value, done } = await reader.read()
-      if (done) break
-      buffer += decoder.decode(value, { stream: true })
-      const parts = buffer.split('\n\n')
-      buffer = parts.pop()
-      for (const block of parts) {
-        const ev = parseBlock(block)
-        if (ev) onEvent(ev)
-      }
+  const reader = resp.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  for (;;) {
+    const { value, done } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const parts = buffer.split('\n\n')
+    buffer = parts.pop()
+    for (const block of parts) {
+      const ev = parseBlock(block)
+      if (ev) onEvent(ev)
     }
   }
+}
 
-  return { streamChat }
+export function useSSE() {
+  function streamChat({ sessionId, message, onEvent }) {
+    return postSSE('/api/chat', { session_id: sessionId, message }, onEvent)
+  }
+
+  function resumeChat({ sessionId, tasks, onEvent }) {
+    return postSSE('/api/resume', { session_id: sessionId, tasks }, onEvent)
+  }
+
+  return { streamChat, resumeChat }
 }

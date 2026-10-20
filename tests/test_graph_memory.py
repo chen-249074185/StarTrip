@@ -7,6 +7,7 @@ import json
 from langgraph.checkpoint.memory import InMemorySaver
 
 import app.graph as graph_module
+from app.config import settings
 from app.nodes import executor as executor_mod
 from app.nodes import planner as planner_mod
 from app.nodes import retriever as retriever_mod
@@ -61,6 +62,7 @@ async def fake_reviewer_chat(system, user, **kwargs):
 
 async def test_multi_turn_history_reaches_planner(monkeypatch):
     planner_prompts.clear()
+    monkeypatch.setattr(settings, "hitl_enabled", False)
     monkeypatch.setattr(router_mod, "chat", fake_router_chat)
     monkeypatch.setattr(planner_mod, "chat", fake_planner_chat)
     monkeypatch.setattr(executor_mod, "get_tool", lambda name: fake_tool)

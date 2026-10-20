@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.responses import StreamingResponse
+from langgraph.types import Command
 from pydantic import BaseModel
 
 import app.graph as graph_module
@@ -75,9 +76,65 @@ class ChatRequest(BaseModel):
     message: str
 
 
+class ResumeRequest(BaseModel):
+    session_id: str
+    tasks: list[dict] | None = None
+
+
 def sse(event: str, data: dict) -> str:
     """格式化为 SSE 事件块。"""
     return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+
+def interrupt_payload(snapshot) -> dict | None:
+    """从暂停态里取第一个 interrupt 的 value（HITL 任务清单）。"""
+    if not getattr(snapshot, "next", ()):
+        return None
+    for task in getattr(snapshot, "tasks", ()) or ():
+        for item in getattr(task, "interrupts", ()) or ():
+            value = getattr(item, "value", None) or {}
+            if isinstance(value, dict):
+                return {
+                    "tasks": value.get("tasks", []),
+                    "msg": value.get("msg", "请确认任务清单"),
+                }
+    return None
+
+
+async def stream_graph(graph_input, config: dict):
+    """跑图并转 SSE：有 interrupt 则暂停，否则推 result。"""
+    final: dict = {}
+    try:
+        async for ev in graph_module.graph.astream_events(
+            graph_input, config, version="v2"
+        ):
+            name = ev.get("name")
+            if name not in NODE_STAGE:
+                continue
+            stage, start_msg = NODE_STAGE[name]
+            if ev["event"] == "on_chain_start":
+                yield sse("progress", {"stage": stage, "msg": start_msg})
+            elif ev["event"] == "on_chain_end":
+                out = ev["data"].get("output")
+                if isinstance(out, dict):
+                    final.update(out)
+                    yield sse("node", {"node": name, "stage": stage, **node_summary(name, out)})
+
+        snapshot = await graph_module.graph.aget_state(config)
+        payload = interrupt_payload(snapshot)
+        if payload is not None:
+            yield sse("interrupt", payload)
+        else:
+            yield sse("result", {
+                "trip_plan": final.get("trip_plan"),
+                "score": final.get("score"),
+                "reply": final.get("reply"),
+                "options": final.get("options"),
+            })
+        yield sse("done", {})
+    except Exception as e:  # noqa: BLE001
+        yield sse("error", {"code": 500, "msg": str(e)})
+        yield sse("done", {})
 
 
 @app.get("/health")
@@ -109,34 +166,15 @@ async def config() -> dict:
 
 @app.post("/api/chat")
 async def chat(req: ChatRequest) -> StreamingResponse:
-    """SSE 流：跑 LangGraph 图，把节点事件转成 progress，最后推 result。"""
+    """SSE 流：跑 LangGraph 图，推 progress / node / interrupt / result。"""
+    state_in = {"user_input": req.message, "session_id": req.session_id}
+    config = {"configurable": {"thread_id": req.session_id}}
+    return StreamingResponse(stream_graph(state_in, config), media_type="text/event-stream")
 
-    async def event_stream():
-        state_in = {"user_input": req.message, "session_id": req.session_id}
-        config = {"configurable": {"thread_id": req.session_id}}
-        final: dict = {}
-        try:
-            async for ev in graph_module.graph.astream_events(state_in, config, version="v2"):
-                name = ev.get("name")
-                if name not in NODE_STAGE:
-                    continue
-                stage, start_msg = NODE_STAGE[name]
-                if ev["event"] == "on_chain_start":
-                    yield sse("progress", {"stage": stage, "msg": start_msg})
-                elif ev["event"] == "on_chain_end":
-                    out = ev["data"].get("output")
-                    if isinstance(out, dict):
-                        final.update(out)
-                        yield sse("node", {"node": name, "stage": stage, **node_summary(name, out)})
-            yield sse("result", {
-                "trip_plan": final.get("trip_plan"),
-                "score": final.get("score"),
-                "reply": final.get("reply"),
-                "options": final.get("options"),
-            })
-            yield sse("done", {})
-        except Exception as e:  # noqa: BLE001
-            yield sse("error", {"code": 500, "msg": str(e)})
-            yield sse("done", {})
 
-    return StreamingResponse(event_stream(), media_type="text/event-stream")
+@app.post("/api/resume")
+async def resume(req: ResumeRequest) -> StreamingResponse:
+    """HITL 恢复：用确认/编辑后的任务清单继续跑同一 thread。"""
+    config = {"configurable": {"thread_id": req.session_id}}
+    command = Command(resume={"tasks": req.tasks or []})
+    return StreamingResponse(stream_graph(command, config), media_type="text/event-stream")
