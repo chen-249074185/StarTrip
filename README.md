@@ -21,7 +21,15 @@
 | 测试 | pytest + httpx |
 | 部署 | docker-compose（PG + Redis + Jaeger + app） |
 
-## 快速开始
+## 一键启动（Windows）
+
+1. 先打开 Docker Desktop（等它显示 Running）
+2. 双击项目根目录的 **`start.bat`**
+3. 浏览器打开 **http://localhost:8000**
+
+停止服务：双击 `stop.bat`（会停掉 app + PostgreSQL + Redis + Jaeger）。
+
+## 快速开始（本地开发）
 
 ```powershell
 # 1. 依赖
@@ -35,9 +43,11 @@ Copy-Item .env.example .env   # 然后填入真实 key
 # 3. 起数据库与缓存
 docker compose up -d
 
-# 4. 启动服务
-uvicorn app.main:app --reload
+# 4. 启动服务（不要直接运行 app/main.py）
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --port 8000
 ```
+
+前端开发模式：另开终端 `cd frontend; npm run dev`，访问 `http://localhost:5173`。
 
 ## Docker 部署
 
@@ -48,15 +58,16 @@ Copy-Item .env.example .env   # 填 DEEPSEEK_API_KEY / DASHSCOPE_API_KEY / AMAP_
 # 2. 起全部服务（PostgreSQL + Redis + Jaeger + app）
 docker compose up -d --build
 
-# 3. 健康检查
-Invoke-RestMethod http://localhost:8000/health
+# 3. 打开应用（前端已内置）
+start http://localhost:8000
 ```
 
+- Docker 镜像会多阶段构建前端，FastAPI 直接托管 `frontend/dist`，**不需要再单独起前端**
 - 首次部署需构建知识库（容器内执行）：
   ```powershell
   docker compose exec -T app python -m scripts.build_kb
   ```
-- 前端仍需单独启动：`cd frontend; npm run dev`（或 `npm run build` 后托管 `dist/`）
+- 本地前端开发仍可用 `cd frontend; npm run dev`（5173，代理到 8000）
 - HITL 默认开启；全自动规划可设 `HITL_ENABLED=false`
 - 可观测：`OTEL_ENABLED=true`，Jaeger UI `http://localhost:16686`
 - 离线评测：`docker compose exec -T app python -m scripts.run_eval --limit 3`

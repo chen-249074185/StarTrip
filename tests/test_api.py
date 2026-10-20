@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from types import SimpleNamespace
 
 import httpx
@@ -161,6 +162,14 @@ async def test_chat_error_event(monkeypatch):
     events = parse_sse(resp.text)
     assert dict(events)["error"]["msg"] == "boom"
     assert events[-1][0] == "done"
+
+
+async def test_frontend_root_if_built():
+    if not Path("frontend/dist/index.html").exists():
+        pytest.skip("前端未构建")
+    resp = await get("/")
+    assert resp.status_code == 200
+    assert "text/html" in resp.headers["content-type"]
 
 
 async def test_health_and_config():

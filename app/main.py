@@ -1,9 +1,11 @@
 
 import json
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Query
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from langgraph.types import Command
 from opentelemetry.trace import Span, Status, StatusCode
 from pydantic import BaseModel, Field
@@ -364,3 +366,15 @@ async def resume(
         raise HTTPException(404, "没有待确认的任务")
     command = Command(resume={"tasks": req.tasks or []})
     return StreamingResponse(stream_graph(command, config), media_type="text/event-stream")
+
+
+# 生产/演示：FastAPI 直接托管前端构建产物（本地 Vite dev 不受影响）
+_FRONTEND_DIST = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+if _FRONTEND_DIST.is_dir():
+    _ASSETS = _FRONTEND_DIST / "assets"
+    if _ASSETS.is_dir():
+        app.mount("/assets", StaticFiles(directory=_ASSETS), name="assets")
+
+    @app.get("/", include_in_schema=False)
+    async def index() -> FileResponse:
+        return FileResponse(_FRONTEND_DIST / "index.html")
