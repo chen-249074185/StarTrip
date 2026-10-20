@@ -96,4 +96,4 @@ StarTrip/
 
 ## 状态
 
-M0~M8 已完成：多 Agent 编排、工具、RAG、审查回环、Vue 前端、可靠性四件套、Checkpoint/多轮记忆、HITL、OTel 可观测、LLM-as-judge 离线评测、Docker 部署；JWT 鉴权已实现（可选开启）。
+M0~M8 已完成：多 Agent 编排、工具、RAG、审查回环、Vue 前端、可靠性四件套、Checkpoint/多轮记忆、HITL、OTel 可观测、LLM-as-judge 离线评测、Docker 部署；JWT 鉴权与行程落库（`/api/trips`）已实现。

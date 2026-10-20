@@ -77,7 +77,8 @@ async def _run(args: argparse.Namespace) -> None:
     if args.limit:
         cases = cases[: args.limit]
 
-    settings.hitl_enabled = False   # 评测全自动，不等待人工确认
+    settings.hitl_enabled = False          # 评测全自动，不等待人工确认
+    settings.trip_persist_enabled = False  # 不污染线上 trips 表
     graph = compile_graph(InMemorySaver())
 
     rows: list[dict] = []

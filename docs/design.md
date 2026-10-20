@@ -155,14 +155,15 @@ class TripState(TypedDict):
 | RAG 节点 retriever | 知识增强 | tool_results → rag_hints | 查询改写 → 混合检索（dense 余弦 + sparse 关键词，RRF） |
 | 审查节点 reviewer | 行程生成+评分 | 汇总 → trip_plan+score | LLM 生成行程 + 结构化评分；输出不达标原因 |
 | 收尾节点 remember | 写回对话历史 | reply+trip_plan+history → history | 每轮追加一条 assistant 消息（回复 + 行程摘要），回环期间不写 |
+| 落库节点 persist | 行程持久化 | trip_plan+score+session_id → trip_id | 写 trips 表；失败只记录，不影响回复 |
 
 ### 5.3 边与回环
 ```
-START → router ──(chat/recommend)──→ chat/recommend → remember → END
-             └──(plan)→ planner → confirm → executor → retriever → reviewer ─┬→ remember → END
+START → router ──(chat/recommend)──→ chat/recommend → remember → persist → END
+             └──(plan)→ planner → confirm → executor → retriever → reviewer ─┬→ remember → persist → END
                                    ↑_______________________________│
                       score < 80 且 retry_count < 3 → 回 planner（携带 feedback）
-                      score ≥ 80 或 retry_count ≥ 3 → remember → END（输出当前最优）
+                      score ≥ 80 或 retry_count ≥ 3 → remember → persist → END（输出当前最优）
 ```
 - **入口路由**：router 节点判定 `intent`——闲聊/信息不足（追问）直接 END，规划才进主链（§12.7）
 - 条件边：reviewer 后判断 `score`（阈值 = 80）
@@ -397,6 +398,8 @@ CREATE TABLE docs (
 );
 CREATE INDEX ON docs USING hnsw (embedding vector_cosine_ops);
 ```
+
+- **当前落地**：`trips` 由 `persist` 节点写入；`GET /api/trips` 返回列表（id/title/score/days/created_at），`GET /api/trips/{id}` 返回完整 `trip_plan`；查询按 `user_id:session_id` 过滤。
 
 ---
 

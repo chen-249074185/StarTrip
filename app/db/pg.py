@@ -45,6 +45,21 @@ USERS_DDL = [
     """,
 ]
 
+# 行程表
+TRIPS_DDL = [
+    """
+    CREATE TABLE IF NOT EXISTS trips (
+      id          BIGSERIAL PRIMARY KEY,
+      session_id  TEXT NOT NULL,
+      title       TEXT,
+      plan_json   JSONB NOT NULL,
+      score       NUMERIC(5,2),
+      created_at  TIMESTAMPTZ DEFAULT now()
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS trips_session_created ON trips (session_id, created_at DESC)",
+]
+
 
 def get_pool() -> ConnectionPool:
     """惰性创建同步连接池。"""
@@ -74,7 +89,7 @@ def close_pool() -> None:
 
 def _init_schema_sync() -> None:
     with get_pool().connection() as conn:
-        for stmt in [*DOCS_DDL, *USERS_DDL]:
+        for stmt in [*DOCS_DDL, *USERS_DDL, *TRIPS_DDL]:
             conn.execute(stmt)
 
 

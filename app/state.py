@@ -24,10 +24,11 @@ class TripState(TypedDict, total=False):
     # ===== 检索 =====
     rag_hints: list[str]         # RAG 检索补充
 
-    # ===== 审查 =====
+    # ===== 审查 / 落库 =====
     trip_plan: dict | None       # 行程方案
     score: float | None          # 审查评分（0~100）
     feedback: str | None         # 审查不达标原因（回环输入）
+    trip_id: int | None          # 落库后的 trips.id
 
     # ===== 控制 =====
     retry_count: int             # 回环已用次数，上限 3

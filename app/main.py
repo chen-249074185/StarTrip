@@ -2,7 +2,7 @@
 import json
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from langgraph.types import Command
 from opentelemetry.trace import Span, Status, StatusCode
@@ -18,6 +18,7 @@ from app.auth import (
 from app.config import settings
 from app.db.checkpoint import init_checkpointer
 from app.db.pg import close_pool, init_schema, open_pool
+from app.db.trips import get_trip, list_trips
 from app.observability import (
     get_tracer,
     node_attributes,
@@ -125,7 +126,7 @@ def interrupt_payload(snapshot) -> dict | None:
     return None
 
 
-TRACE_NODES = set(NODE_STAGE) | {"confirm", "remember"}
+TRACE_NODES = set(NODE_STAGE) | {"confirm", "remember", "persist"}
 
 
 async def stream_graph(graph_input, config: dict):
@@ -184,6 +185,7 @@ async def stream_graph(graph_input, config: dict):
                 interrupted = True
                 yield sse("interrupt", payload)
             else:
+                values = getattr(snapshot, "values", {}) or {}
                 score = final.get("score")
                 span.set_attribute(
                     "run.score", float(score) if score is not None else 0.0
@@ -195,6 +197,7 @@ async def stream_graph(graph_input, config: dict):
                     "score": score,
                     "reply": final.get("reply"),
                     "options": final.get("options"),
+                    "trip_id": values.get("trip_id"),
                 })
             yield sse("done", {})
         except Exception as e:  # noqa: BLE001
@@ -268,6 +271,32 @@ async def me(user_id: str | None = Depends(get_current_user)) -> dict:
         "msg": "ok",
         "data": {"user_id": user_id, "auth_enabled": settings.auth_enabled},
     }
+
+
+@app.get("/api/trips")
+async def trips(
+    session_id: str = Query(min_length=1, max_length=128),
+    limit: int = Query(20, ge=1, le=50),
+    user_id: str | None = Depends(get_current_user),
+) -> dict:
+    """历史行程列表（按用户 + 会话隔离）。"""
+    thread_id = thread_id_for(user_id, session_id)
+    rows = await list_trips(thread_id, limit)
+    return {"code": 0, "msg": "ok", "data": {"trips": rows}}
+
+
+@app.get("/api/trips/{trip_id}")
+async def trip_detail(
+    trip_id: int,
+    session_id: str = Query(min_length=1, max_length=128),
+    user_id: str | None = Depends(get_current_user),
+) -> dict:
+    """行程详情；不属于当前 session 的一律 404。"""
+    thread_id = thread_id_for(user_id, session_id)
+    row = await get_trip(trip_id, thread_id)
+    if row is None:
+        raise HTTPException(404, "行程不存在")
+    return {"code": 0, "msg": "ok", "data": row}
 
 
 @app.post("/api/chat")

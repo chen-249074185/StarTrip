@@ -53,6 +53,9 @@ class Settings(BaseSettings):
     # ===== HITL =====
     hitl_enabled: bool = True                # 执行前是否暂停，等待用户确认任务清单
 
+    # ===== 行程持久化 =====
+    trip_persist_enabled: bool = True
+
     # ===== 可观测（OTel / Jaeger）=====
     otel_enabled: bool = False
     otel_service_name: str = "startrip-agent"

@@ -4,6 +4,7 @@ from langgraph.graph import END, START, StateGraph
 from app.nodes.chat_reply import chat_reply
 from app.nodes.confirm import confirm
 from app.nodes.executor import executor
+from app.nodes.persist import persist
 from app.nodes.planner import planner
 from app.nodes.recommend import recommend
 from app.nodes.remember import remember
@@ -50,6 +51,7 @@ def build_graph() -> StateGraph:
     g.add_node("retriever", retriever)
     g.add_node("reviewer", reviewer)
     g.add_node("remember", remember)
+    g.add_node("persist", persist)
 
     g.add_edge(START, "router")
     g.add_conditional_edges(
@@ -69,7 +71,8 @@ def build_graph() -> StateGraph:
         route_after_review,
         {"planner": "planner", "remember": "remember"},
     )
-    g.add_edge("remember", END)
+    g.add_edge("remember", "persist")
+    g.add_edge("persist", END)
 
     return g
 

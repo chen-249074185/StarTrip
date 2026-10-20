@@ -63,6 +63,7 @@ async def fake_reviewer_chat(system, user, **kwargs):
 async def test_multi_turn_history_reaches_planner(monkeypatch):
     planner_prompts.clear()
     monkeypatch.setattr(settings, "hitl_enabled", False)
+    monkeypatch.setattr(settings, "trip_persist_enabled", False)
     monkeypatch.setattr(router_mod, "chat", fake_router_chat)
     monkeypatch.setattr(planner_mod, "chat", fake_planner_chat)
     monkeypatch.setattr(executor_mod, "get_tool", lambda name: fake_tool)
