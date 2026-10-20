@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from app.config import settings
 from app.db.pg import close_pool, init_schema, open_pool
 from app.graph import graph
+from app.resilience import breaker_snapshot
 from app.tools import close_amap
 
 
@@ -84,6 +85,7 @@ async def health() -> dict:
         "redis": "unknown",
         "llm": "ok" if settings.deepseek_api_key else "unconfigured",
         "mcp": "unknown",
+        "breakers": breaker_snapshot(),
     }
 
 

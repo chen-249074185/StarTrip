@@ -39,6 +39,17 @@ class Settings(BaseSettings):
     # ===== RAG =====
     rag_sim_threshold: float = 0.6   # dense 检索余弦相似度阈值（低于则丢弃，防无关资料注入）
 
+    # ===== 可靠性：超时 / 重试 / 熔断 =====
+    llm_connect_timeout: float = 5.0
+    llm_read_timeout: float = 30.0
+    llm_max_retries: int = 3                 # 单次调用最多尝试次数（含首次）
+    llm_fallback_model: str = ""             # 主模型重试耗尽后的备用模型（空则只用主模型）
+    embed_timeout: float = 20.0
+    tool_timeout: float = 8.0
+    tool_max_retries: int = 2                # 工具最多尝试次数（含首次）
+    breaker_failure_threshold: int = 5       # 连续失败多少次打开熔断
+    breaker_reset_timeout: float = 30.0      # 打开后多少秒进入半开探测
+
     # ===== JWT 鉴权 =====
     jwt_secret: str = ""
 

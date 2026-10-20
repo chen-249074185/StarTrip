@@ -11,23 +11,36 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
+from app.config import settings
+from app.resilience import CircuitOpenError, call_resilient
 from app.state import TripState
 from app.tools import get_tool
 
-TOOL_TIMEOUT = 8.0
-
 
 async def call_tool_safe(step: dict) -> Any:
-    """调用单个工具，带超时与异常兜底。"""
+    """调用单个工具：超时 + 重试 + 按工具熔断，失败降级为 error 字典。"""
     name = step.get("tool")
     args = step.get("args") or {}
     fn = get_tool(name) if name else None
     if fn is None:
         return {"error": f"未注册的工具: {name}"}
+
+    async def _call() -> Any:
+        return await fn(args)
+
     try:
-        return await asyncio.wait_for(fn(args), timeout=TOOL_TIMEOUT)
+        return await call_resilient(
+            f"tool:{name}",
+            _call,
+            timeout=settings.tool_timeout,
+            attempts=settings.tool_max_retries,
+            failure_threshold=settings.breaker_failure_threshold,
+            reset_timeout=settings.breaker_reset_timeout,
+        )
+    except CircuitOpenError:
+        return {"error": f"工具熔断中: {name}"}
     except TimeoutError:
-        return {"error": f"工具超时({TOOL_TIMEOUT}s): {name}"}
+        return {"error": f"工具超时({settings.tool_timeout}s): {name}"}
     except Exception as e:  # noqa: BLE001
         return {"error": f"工具失败 {name}: {e}"}
 
