@@ -35,6 +35,7 @@ logs/
 *.sqlite3
 *.db
 data/
+reports/
 uploads/
 
 # ===== 本地记录（不公开）=====

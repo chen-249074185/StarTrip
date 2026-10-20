@@ -591,6 +591,7 @@ async def llm_chat(...): ...
 
 - 指标：`factual_consistency`（与 RAG/工具事实一致率）、`grounded_rate`（有据比例）、`format_valid_rate`（JSON 合法率）。
 - 落地：judge 结果写入 `trips` 旁挂字段，供回归与抽检（§12.6）。
+- **当前落地**：`app/eval/judge.py` 独立裁判（factual_consistency / grounded_rate / issues；`format_valid` 用确定性代码校验），`tests/eval/golden.json` 12 条，`python -m scripts.run_eval` 逐条跑图并输出汇总 JSON。smoke（上海 2 日）：score 88、grounded 0.9、format 1.0、约束命中 1.0。
 
 ### 12.5 可观测性（trace + 埋点）
 
@@ -614,6 +615,7 @@ async def llm_chat(...): ...
 - **流程**：离线跑图 → LLM-as-judge 打分 → 汇总指标；与基线对比，**指标下降即回归失败**。
 - **落地**：`@pytest.mark.eval` 标记，CI 默认 `-m "not eval"`（不烧 token），需要时手动/夜间跑。
 - 与 §12.4 共用 judge；评测结果存档形成趋势。
+- **当前落地**：`scripts/run_eval.py`（`--golden` / `--out` / `--limit`），自动关闭 HITL、用 `InMemorySaver` 隔离用例；报告写 `reports/eval-*.json`（已 gitignore），指标含 factual / grounded / format / 约束命中 / review score。
 
 ### 12.7 入口路由（Router）
 

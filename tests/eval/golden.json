@@ -1,0 +1,75 @@
+[
+  {
+    "id": "shanghai-2d",
+    "input": "帮我规划上海两日游，预算1000，不爱走路",
+    "days": 2,
+    "must_include": ["外滩", "豫园"],
+    "must_avoid": ["迪士尼"]
+  },
+  {
+    "id": "beijing-3d",
+    "input": "北京三天怎么玩？第一次去，想看经典景点",
+    "days": 3,
+    "must_include": ["故宫", "天安门"]
+  },
+  {
+    "id": "chengdu-2d",
+    "input": "成都两日游，想看大熊猫，吃点好吃的",
+    "days": 2,
+    "must_include": ["大熊猫", "宽窄巷子"]
+  },
+  {
+    "id": "hangzhou-2d",
+    "input": "杭州周末两日游，预算800，喜欢自然风景",
+    "days": 2,
+    "must_include": ["西湖", "灵隐寺"]
+  },
+  {
+    "id": "xian-2d",
+    "input": "西安两日游，想去兵马俑和市区经典景点",
+    "days": 2,
+    "must_include": ["兵马俑", "大雁塔"]
+  },
+  {
+    "id": "xiamen-2d",
+    "input": "厦门两天，想去鼓浪屿，节奏慢一点",
+    "days": 2,
+    "must_include": ["鼓浪屿", "曾厝垵"]
+  },
+  {
+    "id": "qingdao-2d",
+    "input": "青岛两日游，看海和德式建筑，预算1200",
+    "days": 2,
+    "must_include": ["栈桥", "八大关"]
+  },
+  {
+    "id": "changsha-2d",
+    "input": "长沙两天，想吃小吃，顺便逛橘子洲",
+    "days": 2,
+    "must_include": ["橘子洲", "岳麓山"]
+  },
+  {
+    "id": "chongqing-2d",
+    "input": "重庆两日游，想看夜景和洪崖洞",
+    "days": 2,
+    "must_include": ["洪崖洞", "解放碑"]
+  },
+  {
+    "id": "sanya-3d",
+    "input": "三亚三天休闲游，带父母，不想太赶",
+    "days": 3,
+    "must_include": ["亚龙湾", "蜈支洲岛"]
+  },
+  {
+    "id": "lijiang-3d",
+    "input": "丽江三天，想逛古城和雪山，预算2000",
+    "days": 3,
+    "must_include": ["丽江古城", "玉龙雪山"]
+  },
+  {
+    "id": "guilin-2d",
+    "input": "桂林两日游，想看山水，坐竹筏",
+    "days": 2,
+    "must_include": ["漓江", "象鼻山"]
+  }
+]
