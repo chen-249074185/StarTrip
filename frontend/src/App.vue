@@ -15,7 +15,9 @@ const loading = ref(false)
 const amapKey = ref('')
 const securityCode = ref('')
 const spotCoords = ref({})
-const sessionId = 'web-' + Math.random().toString(36).slice(2, 8)
+const savedSession = sessionStorage.getItem('startrip_session')
+const sessionId = savedSession || 'web-' + Math.random().toString(36).slice(2, 8)
+if (!savedSession) sessionStorage.setItem('startrip_session', sessionId)
 const { streamChat } = useSSE()
 
 onMounted(async () => {

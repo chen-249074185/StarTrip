@@ -7,6 +7,7 @@ import random
 
 from app.db.pg import fetch
 from app.llm import chat
+from app.memory import prior_history
 from app.state import TripState
 
 RECOMMEND_PROMPT = """你是旅行推荐官。根据用户的话和当前季节，从给定的「城市池」里挑 5-6 个当季适合的目的地。
@@ -32,6 +33,9 @@ async def recommend(state: TripState) -> dict:
     random.shuffle(cities)          # 每次顺序不同 → 推荐更多样
     pool = cities[:20]
     msg = f"用户说:{user_input}\n当前季节:{season}\n城市池:{pool}"
+    prior = prior_history(state.get("history") or [])
+    if prior:
+        msg = f"最近对话:\n{prior}\n\n{msg}"
     try:
         raw = await chat(RECOMMEND_PROMPT, msg, response_format="json_object", temperature=0.9)
         data = json.loads(raw)

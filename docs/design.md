@@ -153,14 +153,15 @@ class TripState(TypedDict):
 | 执行节点 executor | 工具调度 | tasks → tool_results | asyncio.gather 并发；超时/降级 |
 | RAG 节点 retriever | 知识增强 | tool_results → rag_hints | 查询改写 → 混合检索（dense 余弦 + sparse 关键词，RRF） |
 | 审查节点 reviewer | 行程生成+评分 | 汇总 → trip_plan+score | LLM 生成行程 + 结构化评分；输出不达标原因 |
+| 收尾节点 remember | 写回对话历史 | reply+trip_plan+history → history | 每轮追加一条 assistant 消息（回复 + 行程摘要），回环期间不写 |
 
 ### 5.3 边与回环
 ```
-START → router ──(chat/clarify)─────────────────────────────→ END
-             └──(plan)→ planner → executor → retriever → reviewer → END
-                                   ↑___________________________│
+START → router ──(chat/recommend)──→ chat/recommend → remember → END
+             └──(plan)→ planner → executor → retriever → reviewer ─┬→ remember → END
+                                   ↑_______________________________│
                       score < 80 且 retry_count < 3 → 回 planner（携带 feedback）
-                      score ≥ 80 或 retry_count ≥ 3 → END（输出当前最优）
+                      score ≥ 80 或 retry_count ≥ 3 → remember → END（输出当前最优）
 ```
 - **入口路由**：router 节点判定 `intent`——闲聊/信息不足（追问）直接 END，规划才进主链（§12.7）
 - 条件边：reviewer 后判断 `score`（阈值 = 80）
@@ -539,6 +540,7 @@ async for ev in graph.astream_events(input_state, config, version="v2"):
 - **fault tolerance**：同 super-step 内已成功节点的 writes 会持久化，恢复时**不重跑**，只补未完成部分（省 token）。
 - **time-travel**：可读历史 checkpoint 回放到任一 super-step，定位"哪一步开始跑偏"。
 - 依赖：`langgraph-checkpoint-postgres`（Psycopg 3）；手动传连接时需 `autocommit=True`、`row_factory=dict_row`。
+- **Windows 实现取舍**：psycopg async 需要 SelectorEventLoop，而 MCP stdio 子进程需要 ProactorEventLoop。故不用 `AsyncPostgresSaver`，改为**同步 `PostgresSaver` + 异步适配器**（`app/db/checkpoint.py`）：复用同步连接池，把 `aget_tuple/alist/aput/aput_writes` 用 `asyncio.to_thread` 桥接。主循环保持 Proactor，两者可共存；PG 不可用时降级 `InMemorySaver`。
 
 ### 12.2 LLM 故障四件套：超时 / 重试 / 熔断 / 降级隔离
 
@@ -575,6 +577,7 @@ async def llm_chat(...): ...
 | token 预算 | `tiktoken` 预估，超 `max_context` 前触发压缩/裁剪 | 防硬报错 |
 
 - 组合策略：**历史摘要压缩 + RAG topK=5** 为默认；摘要失败则退化为截断（§12.2 降级思想）。
+- **当前落地**：先做截断版——保留最近 10 条消息（约 5 轮），单条截断 800 字；LLM 摘要压缩留作后续。
 - 每次请求记录 `prompt_tokens/completion_tokens`，汇总到 §12.5 埋点。
 
 ### 12.4 幻觉治理与评估（三道关）

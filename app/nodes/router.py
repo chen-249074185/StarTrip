@@ -6,12 +6,14 @@ import json
 from datetime import date
 
 from app.llm import chat
+from app.memory import append_message, format_history
 from app.state import TripState
 
 ROUTER_PROMPT = """你是旅行助手的意图路由器。判断用户这句话：
 - "plan"：用户明确说了想去的目的地（城市 / 地区）
 - "recommend"：表达了想出行 / 旅游 / 玩的意愿，但没给目的地（如"我想出去玩""有什么推荐""想散散心"）
 - "chat"：与出行旅游完全无关的话题（如"你是谁""今天几号""讲个笑话"）
+可参考「最近对话」理解指代（如"那第二天呢""那里怎么样"）。
 输出 JSON：{"intent": "plan"|"recommend"|"chat", "city": "目的地，没有则空字符串"}
 只输出 JSON，不要解释。"""
 
@@ -32,8 +34,11 @@ def current_season() -> str:
 async def router(state: TripState) -> dict:
     user_input = state.get("user_input", "")
     season = state.get("season") or current_season()
+    history = state.get("history") or []
+    prior = format_history(history, limit=6)
+    msg = f"最近对话:\n{prior}\n\n当前用户:\n{user_input}" if prior else user_input
     try:
-        raw = await chat(ROUTER_PROMPT, user_input, response_format="json_object")
+        raw = await chat(ROUTER_PROMPT, msg, response_format="json_object")
         data = json.loads(raw)
         intent = data.get("intent") or "recommend"
         city = (data.get("city") or "").strip()
@@ -44,4 +49,20 @@ async def router(state: TripState) -> dict:
     # 关键词兜底：LLM 误判成 chat，但明显在聊出行 → recommend
     if intent == "chat" and any(k in user_input for k in _TRAVEL_HINTS):
         intent = "recommend"
-    return {"intent": intent, "city": city, "season": season}
+
+    return {
+        "intent": intent,
+        "city": city,
+        "season": season,
+        "history": append_message(history, "user", user_input),
+        # 新一轮：清掉上一轮的中间产物，history 跨轮保留
+        "retry_count": 0,
+        "tasks": [],
+        "tool_results": {},
+        "rag_hints": [],
+        "trip_plan": None,
+        "score": None,
+        "feedback": None,
+        "reply": None,
+        "options": [],
+    }

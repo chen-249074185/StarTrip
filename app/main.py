@@ -6,9 +6,10 @@ from fastapi import FastAPI
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+import app.graph as graph_module
 from app.config import settings
+from app.db.checkpoint import init_checkpointer
 from app.db.pg import close_pool, init_schema, open_pool
-from app.graph import graph
 from app.resilience import breaker_snapshot
 from app.tools import close_amap
 
@@ -18,8 +19,11 @@ async def lifespan(_: FastAPI):
     try:
         open_pool()
         await init_schema()
+        checkpointer = await init_checkpointer()
+        graph_module.set_checkpointer(checkpointer)
+        print("[startup] Checkpoint 已启用（PostgresSaver）")
     except Exception as e:  # noqa: BLE001
-        print(f"[startup] PG 未就绪，跳过初始化: {e}")
+        print(f"[startup] PG 未就绪，降级为内存 Checkpoint: {e}")
     yield
     await close_amap()   # 释放 MCP 会话
     close_pool()
@@ -85,6 +89,7 @@ async def health() -> dict:
         "redis": "unknown",
         "llm": "ok" if settings.deepseek_api_key else "unconfigured",
         "mcp": "unknown",
+        "checkpoint": graph_module.checkpointer_kind(),
         "breakers": breaker_snapshot(),
     }
 
@@ -111,7 +116,7 @@ async def chat(req: ChatRequest) -> StreamingResponse:
         config = {"configurable": {"thread_id": req.session_id}}
         final: dict = {}
         try:
-            async for ev in graph.astream_events(state_in, config, version="v2"):
+            async for ev in graph_module.graph.astream_events(state_in, config, version="v2"):
                 name = ev.get("name")
                 if name not in NODE_STAGE:
                     continue

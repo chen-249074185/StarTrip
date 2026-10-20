@@ -5,9 +5,11 @@ from __future__ import annotations
 import json
 
 from app.llm import chat
+from app.memory import prior_history
 from app.state import TripState
 
 REVIEWER_PROMPT = """你是行程审查官。根据用户需求、工具结果与攻略知识，生成完整行程并评分。
+若用户是在上一轮行程上提修改（如"第二天不要博物馆"），请结合「最近对话」中的行程摘要，保留未要求改动的部分。
 
 输出 JSON：
 {
@@ -28,10 +30,12 @@ async def reviewer(state: TripState) -> dict:
     tool_results = state.get("tool_results", {})
     rag_hints = state.get("rag_hints", [])
 
+    prior = prior_history(state.get("history") or [])
     msg = (
-        f"用户需求:{user_input}\n"
-        f"工具结果:{json.dumps(tool_results, ensure_ascii=False)[:4000]}\n"
-        f"攻略知识:{rag_hints}"
+        (f"最近对话:\n{prior}\n\n" if prior else "")
+        + f"用户需求:{user_input}\n"
+        + f"工具结果:{json.dumps(tool_results, ensure_ascii=False)[:4000]}\n"
+        + f"攻略知识:{rag_hints}"
     )
     try:
         raw = await chat(REVIEWER_PROMPT, msg, response_format="json_object")
