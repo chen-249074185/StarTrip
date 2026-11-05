@@ -128,3 +128,16 @@ def test_golden_set_schema():
     for case in data:
         assert case["input"]
         assert case["must_include"]
+
+
+def test_hard_golden_set_schema():
+    data = json.loads(Path("tests/eval/golden_hard.json").read_text(encoding="utf-8"))
+    assert len(data) >= 10
+    ids = [case["id"] for case in data]
+    assert len(ids) == len(set(ids))
+    for case in data:
+        assert case["input"]
+        assert case["category"]
+    assert any(case.get("expect_no_answer") for case in data)
+    assert any(case["category"] == "paraphrase" for case in data)
+    assert any(case["category"] == "conflict" for case in data)

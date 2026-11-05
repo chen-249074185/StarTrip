@@ -26,8 +26,11 @@ async def persist(state: TripState) -> dict:
     plan = normalize_plan(state.get("trip_plan"))
     score = state.get("score")
     session_id = state.get("session_id") or ""
+    validation = state.get("validation") or {}
     if not plan_is_usable(plan) or score is None or not session_id:
         return {}
+    if validation and not validation.get("ok", True):
+        return {}   # 确定性校验不通过：不落库，避免把不可行行程当成功结果
     try:
         trip_id = await save_trip(session_id, _title(state, plan), plan, float(score))
         return {"trip_id": trip_id}

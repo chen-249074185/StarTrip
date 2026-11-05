@@ -11,6 +11,7 @@ from app.memory import prior_history
 from app.plan import normalize_plan, plan_is_usable
 from app.prefs import format_prefs, get_prefs
 from app.state import TripState
+from app.validate import validate_plan
 
 REVIEWER_PROMPT = """你是行程审查官。根据用户需求、工具结果与攻略知识，生成完整行程并评分。
 若用户是在上一轮行程上提修改（如"第二天不要博物馆"），请结合「最近对话」中的行程摘要，保留未要求改动的部分。
@@ -62,15 +63,22 @@ async def reviewer(state: TripState) -> dict:
         plan = normalize_plan(data.get("trip_plan"))
         score = _parse_score(data.get("score"))
         feedback = data.get("feedback") or None
+        validation = validate_plan(plan, user_input=user_input)
         if not plan_is_usable(plan):
             # 结构不完整时不能给高分，否则会把空行程当成功结果落库
             score = 0.0
             feedback = feedback or "行程结构不完整（缺少日期或景点）"
+        elif not validation.ok:
+            # 确定性校验失败：压分并回传结构化错误，触发 Planner 重规划
+            score = min(score, 60.0)
+            text = validation.feedback()
+            feedback = f"{feedback}；{text}" if feedback else text
         return {
             "trip_plan": plan,
             "score": score,
             "reply": data.get("reply") or "",
             "feedback": feedback,
+            "validation": validation.to_dict(),
         }
     except Exception:  # noqa: BLE001
         return {"trip_plan": {"days": []}, "score": 0.0, "reply": "", "feedback": "生成失败，请重试"}

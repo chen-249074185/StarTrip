@@ -52,7 +52,10 @@ async def fake_reviewer_chat(system, user, **kwargs):
     return json.dumps(
         {
             "trip_plan": {
-                "days": [{"date": "D1", "spots": [{"name": "外滩"}]}],
+                "days": [
+                    {"date": "D1", "spots": [{"name": "外滩", "time": "09:00-10:30"}]},
+                    {"date": "D2", "spots": [{"name": "豫园", "time": "09:00-10:30"}]},
+                ],
             },
             "score": 90,
             "reply": "已安排 D1 外滩",

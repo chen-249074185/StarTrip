@@ -17,6 +17,7 @@
 ## 亮点
 
 - **可回环的工作流**：Reviewer 从时间衔接、路线合理性、偏好匹配、预算、内容丰富度 5 个维度打分；低于 80 分带 feedback 回到 Planner，最多 3 次。
+- **确定性校验**：时间重叠、预算超支、重复景点、必去/避开、天数不足会直接压分并回传结构化错误；LLM 负责偏好，规则负责可行性。
 - **混合检索**：pgvector dense（余弦）+ ILIKE sparse（关键词）+ RRF 融合；查询改写拆成多路 dense query + keywords，固定注入 topK=5。
 - **工具治理**：高德 MCP（POI / 路线 / 天气）+ 天气服务；超时、指数退避重试、三态熔断、失败隔离，单个工具挂掉不拖垮整张图。
 - **HITL + 断点续跑**：执行前 `interrupt` 让用户确认/编辑任务清单；Postgres Checkpoint 支持暂停、恢复、多轮记忆。
@@ -60,7 +61,7 @@ flowchart LR
 | `confirm` | HITL：执行前暂停，等待用户确认/编辑 |
 | `executor` | 并发执行工具，超时/重试/熔断/失败隔离 |
 | `retriever` | 查询改写 → dense + sparse → RRF → topK 攻略 |
-| `reviewer` | 生成行程 + 5 维评分 + feedback；不合格回环 |
+| `reviewer` | 生成行程 + 5 维评分 + 确定性校验 + feedback；不合格回环 |
 | `remember` | 写入多轮记忆 / 摘要 |
 | `persist` | 行程落库，支持 `/api/trips` 查询 |
 
@@ -89,7 +90,7 @@ flowchart LR
 
 ## 评测结果
 
-### 检索层（12 条固定集）
+### 检索层（12 条基础集）
 
 | 指标 | 值 |
 |---|---:|
@@ -99,6 +100,17 @@ flowchart LR
 | key_fact_coverage | 1.0 |
 | no_answer_false_positive_rate | 0.0 |
 | avg_latency_ms | 852.1 |
+
+### 规则校验指标（已接入评测脚本）
+
+| 指标 | 含义 |
+|---|---|
+| `feasibility_rate` | 行程通过确定性校验的比例 |
+| `time_conflict_rate` | 时间重叠 / 时间不合法比例 |
+| `budget_overrun_rate` | 预算超支比例 |
+| `duplicate_rate` | 重复景点比例 |
+
+> 旧报告尚未包含这组指标；下次配好 PG/Key 后重跑 `scripts/run_eval.py` 即可得到新数字。
 
 ### 端到端 smoke（1 条）
 
@@ -115,11 +127,11 @@ flowchart LR
 ### 测试
 
 ```text
-73 passed, 3 skipped
+83 passed, 3 skipped
 ruff: All checks passed
 ```
 
-> 说明：12 条检索集偏小、关键词与知识库重合度高，1.0 的指标偏乐观；端到端只跑了 1 条 smoke。评测方法、指标定义和下一步扩集计划见 [`docs/EVAL.md`](docs/EVAL.md)。
+> 说明：12 条基础集偏小、关键词与知识库重合度高，1.0 的指标偏乐观；另准备了 11 条硬集（`tests/eval/golden_hard.json`，含 paraphrase / no-answer / conflict），需 PG + Key 后跑。端到端只跑了 1 条 smoke。评测方法、指标定义和复现命令见 [`docs/EVAL.md`](docs/EVAL.md)。
 
 ---
 
@@ -216,6 +228,7 @@ app/
   observability.py     OTel 初始化 + 节点 span
   memory.py            多轮记忆 / 摘要
   prefs.py             Redis 偏好
+  validate.py          确定性校验：时间/预算/重复/必去/避开/天数
   auth.py              JWT（可选）
   nodes/               router / planner / confirm / executor / retriever / reviewer / recommend / chat_reply / remember / persist
   rag/                 query rewrite + dense/sparse/RRF

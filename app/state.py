@@ -28,6 +28,7 @@ class TripState(TypedDict, total=False):
     trip_plan: dict | None       # 行程方案
     score: float | None          # 审查评分（0~100）
     feedback: str | None         # 审查不达标原因（回环输入）
+    validation: dict | None      # 确定性校验结果（时间/预算/重复/约束）
     trip_id: int | None          # 落库后的 trips.id
 
     # ===== 控制 =====

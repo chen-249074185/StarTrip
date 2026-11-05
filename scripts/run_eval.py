@@ -21,6 +21,7 @@ from app.eval.judge import judge_trip
 from app.eval.metrics import aggregate, match_constraints
 from app.graph import compile_graph
 from app.tools import close_amap
+from app.validate import validate_plan
 
 
 async def run_case(graph, case: dict) -> dict:
@@ -42,6 +43,12 @@ async def run_case(graph, case: dict) -> dict:
         evidence,
         golden_answer=case.get("golden_answer"),
     )
+    validation = validate_plan(
+        plan,
+        user_input=case["input"],
+        must_include=case.get("must_include"),
+        must_avoid=case.get("must_avoid"),
+    )
     return {
         "id": case["id"],
         "category": case.get("category", "uncategorized"),
@@ -50,6 +57,7 @@ async def run_case(graph, case: dict) -> dict:
         "trip_plan": plan,
         "judge": judged,
         "constraints": match_constraints(plan, case),
+        "validation": validation.to_dict(),
         "latency_ms": latency_ms,
     }
 
@@ -69,6 +77,13 @@ def failed_row(case: dict, error: Exception) -> dict:
             "issues": [str(error)],
         },
         "constraints": match_constraints(None, case),
+        "validation": {
+            "ok": False,
+            "errors": [str(error)],
+            "warnings": [],
+            "checks": {},
+            "metrics": {},
+        },
         "latency_ms": None,
         "error": str(error),
     }
@@ -96,6 +111,10 @@ def write_markdown(report: dict, path: Path) -> None:
         "format_valid_rate",
         "constraint_include_rate",
         "constraint_avoid_hits",
+        "feasibility_rate",
+        "time_conflict_rate",
+        "budget_overrun_rate",
+        "duplicate_rate",
         "avg_review_score",
         "error_cases",
         "avg_latency_ms",
@@ -108,18 +127,23 @@ def write_markdown(report: dict, path: Path) -> None:
         "",
         "## 逐条结果",
         "",
-        "| id | category | score | factual | grounded | coverage | format | include | latency(ms) | error |",
-        "|---|---|---:|---:|---:|---:|---|---:|---:|---|",
+        "| id | category | score | feasible | time | budget | factual | grounded | coverage | format | include | latency(ms) | error |",
+        "|---|---|---:|---|---|---|---:|---:|---:|---|---:|---:|---|",
     ]
     for row in report["cases"]:
         judge = row.get("judge", {})
         constraints = row.get("constraints", {})
+        validation = row.get("validation") or {}
+        checks = validation.get("checks") or {}
         include = f"{len(constraints.get('include_hits', []))}/{len(constraints.get('include_required', []))}"
         lines.append(
-            "| {id} | {cat} | {score} | {factual} | {grounded} | {coverage} | {fmt} | {inc} | {lat} | {err} |".format(
+            "| {id} | {cat} | {score} | {ok} | {time} | {budget} | {factual} | {grounded} | {coverage} | {fmt} | {inc} | {lat} | {err} |".format(
                 id=row.get("id", ""),
                 cat=row.get("category", ""),
                 score=row.get("score", ""),
+                ok=validation.get("ok", ""),
+                time=checks.get("time", ""),
+                budget=checks.get("budget", ""),
                 factual=judge.get("factual_consistency", ""),
                 grounded=judge.get("grounded_rate", ""),
                 coverage=judge.get("answer_coverage", ""),

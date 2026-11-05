@@ -20,7 +20,20 @@
 - `golden_answer`：参考行程，用于 LLM-as-judge 的 coverage 评分
 - `category`：评测分层
 
-> 局限：12 条偏小，且关键词与知识库重合度较高，指标会偏乐观。下一步扩到 50+ 条，并加入改写 query、跨城市干扰、no-answer。
+> 局限：12 条偏小，且关键词与知识库重合度较高，指标会偏乐观。
+
+### 硬集（`tests/eval/golden_hard.json`）
+
+额外 11 条，专门覆盖基础集不容易暴露的问题：
+
+| 类别 | 数量 | 目的 |
+|---|---:|---|
+| `paraphrase` | 4 | 不直接出现关键词的改写 query |
+| `no_answer` | 2 | 知识库没有的目的地，检查是否拒答 |
+| `conflict` | 1 | 预算 100 必须去迪士尼，检查冲突处理 |
+| `multi_city` / `family` / `budget` / `normal` | 4 | 多城市、带父母、预算、夜景等 |
+
+> 硬集已准备好，但需要在 PG + 知识库 + Key 就绪后跑；当前仓库里的旧报告只包含基础集。
 
 ## 2. 检索层指标
 
@@ -60,6 +73,10 @@
 | `constraint_include_rate` | `must_include` 命中率 |
 | `constraint_avoid_hits` | 命中 `must_avoid` 的次数 |
 | `avg_review_score` | Reviewer 5 维评分均值 |
+| `feasibility_rate` | 行程通过确定性校验（时间/预算/重复/必去/避开/天数）的比例 |
+| `time_conflict_rate` | 时间重叠 / 时间不合法比例 |
+| `budget_overrun_rate` | 预算超支比例 |
+| `duplicate_rate` | 重复景点比例 |
 | `p50/p90/p99_latency_ms` | 端到端延迟分位数 |
 
 ### 当前结果（1 条 smoke）
@@ -80,8 +97,16 @@
 ## 4. 复现
 
 ```bash
-# 检索层
+# 检索层：混合检索
 python -m scripts.eval_retrieval --md reports/retrieval.md
+
+# 检索层 A/B：纯向量 vs 纯关键词 vs 混合
+python -m scripts.eval_retrieval --mode dense --md reports/retrieval-dense.md
+python -m scripts.eval_retrieval --mode sparse --md reports/retrieval-sparse.md
+python -m scripts.eval_retrieval --mode hybrid --md reports/retrieval-hybrid.md
+
+# 硬集
+python -m scripts.eval_retrieval --golden tests/eval/golden_hard.json --md reports/retrieval-hard.md
 
 # 端到端（需要 PG + 知识库 + Key）
 python -m scripts.run_eval --md reports/eval.md

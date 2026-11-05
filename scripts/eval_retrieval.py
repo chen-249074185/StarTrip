@@ -70,13 +70,18 @@ def score_docs(docs: list[dict], facts: list[str]) -> dict[str, Any]:
     }
 
 
-async def run_case(case: dict, topk: int) -> dict[str, Any]:
+async def run_case(case: dict, topk: int, mode: str = "hybrid") -> dict[str, Any]:
     dense_queries, keywords, facts = case_queries(case)
     started = time.perf_counter()
-    dense_ids, sparse_ids = await asyncio.gather(
-        dense_search(dense_queries, topn=20),
-        sparse_search(keywords, topn=20),
-    )
+    if mode == "dense":
+        dense_ids, sparse_ids = await dense_search(dense_queries, topn=20), []
+    elif mode == "sparse":
+        dense_ids, sparse_ids = [], await sparse_search(keywords, topn=20)
+    else:
+        dense_ids, sparse_ids = await asyncio.gather(
+            dense_search(dense_queries, topn=20),
+            sparse_search(keywords, topn=20),
+        )
     fused = rrf(dense_ids, sparse_ids, topk=topk)
     docs = await fetch_contents(fused)
     latency_ms = round((time.perf_counter() - started) * 1000, 1)
@@ -137,6 +142,7 @@ def write_markdown(report: dict, path: Path) -> None:
         f"- 生成时间：{report['created_at']}",
         f"- golden：`{report['golden']}`",
         f"- topK：{report['topk']}",
+        f"- 模式：{report.get('mode', 'hybrid')}",
         "",
         "## 汇总",
         "",
@@ -179,7 +185,7 @@ async def _run(args: argparse.Namespace) -> None:
     for index, case in enumerate(cases, 1):
         print(f"[{index}/{len(cases)}] {case.get('id')} ...")
         try:
-            row = await run_case(case, args.topk)
+            row = await run_case(case, args.topk, args.mode)
         except Exception as exc:  # noqa: BLE001
             print(f"  ERROR: {exc}")
             rows.append(
@@ -203,6 +209,7 @@ async def _run(args: argparse.Namespace) -> None:
         "created_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
         "golden": str(args.golden),
         "topk": args.topk,
+        "mode": args.mode,
         "summary": summarize(rows),
         "cases": rows,
     }
@@ -235,6 +242,12 @@ if __name__ == "__main__":
     parser.add_argument("--out", default="")
     parser.add_argument("--limit", type=int, default=0)
     parser.add_argument("--topk", type=int, default=5)
+    parser.add_argument(
+        "--mode",
+        choices=("hybrid", "dense", "sparse"),
+        default="hybrid",
+        help="检索模式：hybrid=dense+sparse+RRF，dense=纯向量，sparse=纯关键词",
+    )
     parser.add_argument(
         "--md",
         nargs="?",

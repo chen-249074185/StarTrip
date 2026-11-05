@@ -30,10 +30,13 @@ def _build_sparse_sql(n: int) -> str:
 
 async def dense_search(queries: list[str], topn: int = 20) -> list[int]:
     """多路 query 各召回（相似度低于阈值丢弃），保序去重合并。"""
+    if not queries:
+        return []
     ids: list[int] = []
     thr = settings.rag_sim_threshold
-    for q in queries:
-        [emb] = await embed([q])
+    # 批量 embedding：多路 query 一次请求，避免 N 次串行网络往返
+    embeddings = await embed(queries)
+    for emb in embeddings:
         vec = Vector(emb)
         rows = await fetch(DENSE_SQL, (vec, thr, vec, topn))
         ids.extend(r["id"] for r in rows)

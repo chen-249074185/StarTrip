@@ -1,0 +1,104 @@
+[
+  {
+    "id": "shanghai-paraphrase",
+    "input": "周末去上海，不想走太远，想看江景和园林，预算 800",
+    "days": 2,
+    "must_include": ["外滩", "豫园"],
+    "must_avoid": ["迪士尼"],
+    "category": "paraphrase",
+    "golden_answer": "D1：外滩、南京路、豫园/城隍庙；D2：上海博物馆、武康路。预算 800 元以内，减少步行。",
+    "key_facts": ["外滩", "豫园"]
+  },
+  {
+    "id": "beijing-paraphrase",
+    "input": "第一次去北京，想看老皇宫和长城，三天",
+    "days": 3,
+    "must_include": ["故宫", "长城"],
+    "category": "paraphrase",
+    "golden_answer": "D1：天安门、故宫、景山；D2：八达岭长城、奥林匹克公园；D3：颐和园、天坛。",
+    "key_facts": ["故宫", "长城"]
+  },
+  {
+    "id": "chengdu-food",
+    "input": "去成都吃火锅，顺便看熊猫，两天",
+    "days": 2,
+    "must_include": ["大熊猫", "火锅"],
+    "category": "paraphrase",
+    "golden_answer": "D1：大熊猫繁育研究基地、宽窄巷子；D2：武侯祠、锦里、春熙路，安排火锅。",
+    "key_facts": ["大熊猫", "火锅"]
+  },
+  {
+    "id": "xian-paraphrase",
+    "input": "西安两天，想看兵马俑和古城墙",
+    "days": 2,
+    "must_include": ["兵马俑", "城墙"],
+    "category": "paraphrase",
+    "golden_answer": "D1：兵马俑、华清宫；D2：西安城墙、大雁塔、回民街。",
+    "key_facts": ["兵马俑", "城墙"]
+  },
+  {
+    "id": "chongqing-night",
+    "input": "重庆两天，想看夜景和洪崖洞",
+    "days": 2,
+    "must_include": ["洪崖洞", "解放碑"],
+    "category": "normal",
+    "golden_answer": "D1：洪崖洞、解放碑、长江索道；D2：磁器口、李子坝、南山一棵树。",
+    "key_facts": ["洪崖洞", "解放碑"]
+  },
+  {
+    "id": "qingdao-budget",
+    "input": "青岛两天，看海和德式建筑，预算 1200",
+    "days": 2,
+    "must_include": ["栈桥", "八大关"],
+    "category": "budget",
+    "golden_answer": "D1：栈桥、八大关、五四广场；D2：崂山或青岛啤酒博物馆。预算 1200 元。",
+    "key_facts": ["栈桥", "八大关"]
+  },
+  {
+    "id": "sanya-family",
+    "input": "三亚三天带父母，不想太赶",
+    "days": 3,
+    "must_include": ["亚龙湾", "蜈支洲岛"],
+    "category": "family",
+    "golden_answer": "D1：亚龙湾；D2：蜈支洲岛；D3：天涯海角或南山。每天不超过 2-3 个景点。",
+    "key_facts": ["亚龙湾", "蜈支洲岛"]
+  },
+  {
+    "id": "suzhou-garden",
+    "input": "上海到苏州两天，想看园林",
+    "days": 2,
+    "must_include": ["拙政园", "平江路"],
+    "category": "multi_city",
+    "golden_answer": "D1：拙政园、苏州博物馆、平江路；D2：留园、山塘街。",
+    "key_facts": ["拙政园", "平江路"]
+  },
+  {
+    "id": "conflict-budget",
+    "input": "上海两天，预算 100，必须去迪士尼和东方明珠",
+    "days": 2,
+    "must_include": ["迪士尼", "东方明珠"],
+    "category": "conflict",
+    "golden_answer": "预算 100 元无法覆盖迪士尼门票，应明确告知用户预算不足，建议提高预算或替换景点。",
+    "key_facts": ["迪士尼", "东方明珠"]
+  },
+  {
+    "id": "no-answer-iceland",
+    "input": "冰岛五天看极光",
+    "days": 5,
+    "must_include": [],
+    "category": "no_answer",
+    "expect_no_answer": true,
+    "golden_answer": "知识库没有冰岛攻略，应明确拒答或提示暂不支持，不要编造景点。",
+    "key_facts": []
+  },
+  {
+    "id": "no-answer-moon",
+    "input": "月球三天旅行",
+    "days": 3,
+    "must_include": [],
+    "category": "no_answer",
+    "expect_no_answer": true,
+    "golden_answer": "月球旅行目前不可实现，应明确拒答，不要生成行程。",
+    "key_facts": []
+  }
+]

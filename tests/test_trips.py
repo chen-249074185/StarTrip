@@ -70,6 +70,19 @@ async def test_persist_saves_trip(monkeypatch):
     assert captured["score"] == 88.0
 
 
+async def test_persist_skips_invalid_validation(monkeypatch):
+    monkeypatch.setattr(settings, "trip_persist_enabled", True)
+    out = await persist(
+        {
+            "trip_plan": PLAN,
+            "score": 60.0,
+            "session_id": "1:s",
+            "validation": {"ok": False, "errors": ["预算超支"]},
+        }
+    )
+    assert out == {}
+
+
 async def test_persist_skips_without_plan_or_disabled(monkeypatch):
     monkeypatch.setattr(settings, "trip_persist_enabled", True)
     assert await persist({"session_id": "s"}) == {}

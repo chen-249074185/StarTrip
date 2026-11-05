@@ -58,6 +58,11 @@ def aggregate(rows: list[dict[str, Any]]) -> dict:
         for row in rows
         if row.get("latency_ms") is not None
     ]
+    validations = [row.get("validation") for row in rows if row.get("validation")]
+    n_val = len(validations)
+
+    def rate(predicate) -> float:
+        return round(sum(1 for v in validations if predicate(v)) / n_val, 4) if n_val else 0.0
 
     return {
         "cases": n,
@@ -69,6 +74,10 @@ def aggregate(rows: list[dict[str, Any]]) -> dict:
         if include_total
         else 1.0,
         "constraint_avoid_hits": avoid_hits,
+        "feasibility_rate": rate(lambda v: bool(v.get("ok"))),
+        "time_conflict_rate": rate(lambda v: not (v.get("checks") or {}).get("time", True)),
+        "budget_overrun_rate": rate(lambda v: not (v.get("checks") or {}).get("budget", True)),
+        "duplicate_rate": rate(lambda v: not (v.get("checks") or {}).get("duplicates", True)),
         "avg_review_score": avg(lambda r: float(r.get("score") or 0)),
         "error_cases": sum(1 for row in rows if row.get("error")),
         "avg_latency_ms": round(sum(latencies) / len(latencies), 1) if latencies else 0.0,
