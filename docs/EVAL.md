@@ -33,7 +33,22 @@
 | `conflict` | 1 | 预算 100 必须去迪士尼，检查冲突处理 |
 | `multi_city` / `family` / `budget` / `normal` | 4 | 多城市、带父母、预算、夜景等 |
 
-> 硬集已准备好，但需要在 PG + 知识库 + Key 就绪后跑；当前仓库里的旧报告只包含基础集。
+> 本次已在 Docker PG/Redis + 51 条 docs + DashScope `text-embedding-v3` 环境实跑。
+
+### 硬集 A/B 结果（11 条，9 条有答案 + 2 条 no-answer）
+
+| 模式 | Recall@5 | MRR | key_fact_coverage | no-answer FP | 平均耗时 |
+|---|---:|---:|---:|---:|---:|
+| dense | **100.0%** | **1.000** | **100.0%** | 0.0% | 236.2 ms |
+| sparse | 44.4% | 0.315 | 38.9% | 0.0% | 2.4 ms |
+| hybrid | **100.0%** | **1.000** | **100.0%** | 0.0% | 212.4 ms |
+
+> `dense_queries` 模拟 LLM 改写后的 query（含城市/景点），`keywords` 用用户原话里的近义词（如“江景/园林”而不是“外滩/豫园”）。  
+> 结论：sparse-only 在改写 query 上明显不够；dense 已经能覆盖，hybrid 与 dense 持平。hybrid 的价值是关键词兜底，不是在这份集上“更高分”。
+
+### 基础集 A/B
+
+12 条基础集在 dense / sparse / hybrid 三种模式下都是 1.0——说明基础集太简单（query 与知识库关键词高度重合），不能用来证明混合检索的收益。
 
 ## 2. 检索层指标
 
@@ -56,7 +71,7 @@
 | MRR | 1.0 |
 | key_fact_coverage | 1.0 |
 | no_answer_false_positive_rate | 0.0 |
-| avg_latency_ms | 852.1 |
+| avg_latency_ms | 209.8 |
 
 > 这个 1.0 不代表线上效果：当前 query 与知识库关键词重合度高，且没有 no-answer 样本。它的价值是建立基线，后续每次改检索都跑同一套集。
 

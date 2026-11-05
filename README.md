@@ -99,7 +99,17 @@ flowchart LR
 | MRR | 1.0 |
 | key_fact_coverage | 1.0 |
 | no_answer_false_positive_rate | 0.0 |
-| avg_latency_ms | 852.1 |
+| avg_latency_ms | 209.8 |
+
+### 检索层硬集 A/B（11 条）
+
+| 模式 | Recall@5 | MRR | key_fact_coverage | no-answer FP | 平均耗时 |
+|---|---:|---:|---:|---:|---:|
+| dense | **100.0%** | **1.000** | **100.0%** | 0.0% | 236.2 ms |
+| sparse | 44.4% | 0.315 | 38.9% | 0.0% | 2.4 ms |
+| hybrid | **100.0%** | **1.000** | **100.0%** | 0.0% | 212.4 ms |
+
+> 基础集三种模式都是 1.0，说明基础集太简单；硬集用改写 query + 近义关键词，才看出 sparse-only 的短板。hybrid 与 dense 持平，关键词目前是兜底而不是增益。
 
 ### 规则校验指标（已接入评测脚本）
 
@@ -127,11 +137,12 @@ flowchart LR
 ### 测试
 
 ```text
-83 passed, 3 skipped
+86 passed（本地含 PG/Redis）
+83 passed, 3 skipped（CI 无服务时）
 ruff: All checks passed
 ```
 
-> 说明：12 条基础集偏小、关键词与知识库重合度高，1.0 的指标偏乐观；另准备了 11 条硬集（`tests/eval/golden_hard.json`，含 paraphrase / no-answer / conflict），需 PG + Key 后跑。端到端只跑了 1 条 smoke。评测方法、指标定义和复现命令见 [`docs/EVAL.md`](docs/EVAL.md)。
+> 说明：12 条基础集偏小、关键词与知识库重合度高，1.0 的指标偏乐观；硬集 11 条已在 Docker PG + 51 条 docs + DashScope embedding 环境实跑。端到端只跑了 1 条 smoke。评测方法、指标定义和复现命令见 [`docs/EVAL.md`](docs/EVAL.md)。
 
 ---
 
