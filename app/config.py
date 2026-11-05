@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     postgres_user: str = "user"
     postgres_password: str = "pass"
     database_url: str = "postgresql://user:pass@localhost:5432/startrip"
+    db_pool_timeout: float = 5.0        # 取连接/建连超时（秒），防 PG 卡住拖垮请求
 
     # ===== Redis =====
     redis_url: str = "redis://localhost:6379/0"

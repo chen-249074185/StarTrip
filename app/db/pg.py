@@ -67,6 +67,9 @@ def get_pool() -> ConnectionPool:
     if _pool is None:
         _pool = ConnectionPool(
             conninfo=settings.database_url,
+            min_size=1,
+            max_size=10,
+            timeout=settings.db_pool_timeout,
             open=False,
             configure=register_vector,          # 每连接注册 pgvector 类型
             kwargs={"autocommit": True, "row_factory": dict_row},
@@ -77,7 +80,7 @@ def get_pool() -> ConnectionPool:
 def open_pool() -> None:
     pool = get_pool()
     pool.open()
-    pool.wait()
+    pool.wait(timeout=settings.db_pool_timeout)
 
 
 def close_pool() -> None:

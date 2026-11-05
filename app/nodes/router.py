@@ -63,6 +63,7 @@ async def router(state: TripState) -> dict:
         "trip_plan": None,
         "score": None,
         "feedback": None,
+        "trip_id": None,
         "reply": None,
         "options": [],
     }

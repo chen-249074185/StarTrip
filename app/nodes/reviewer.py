@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import json
+import re
+from typing import Any
 
 from app.llm import chat
 from app.memory import prior_history
+from app.plan import normalize_plan, plan_is_usable
 from app.prefs import format_prefs, get_prefs
 from app.state import TripState
 
@@ -26,6 +29,19 @@ REVIEWER_PROMPT = """你是行程审查官。根据用户需求、工具结果�
 只输出 JSON，不要解释。"""
 
 
+_SCORE_RE = re.compile(r"-?\d+(?:\.\d+)?")
+
+
+def _parse_score(value: Any) -> float:
+    """容错解析评分：兼容 "88" / "88分" / 88.5，并夹到 0~100。"""
+    try:
+        num = float(value)
+    except (TypeError, ValueError):
+        match = _SCORE_RE.search(str(value or ""))
+        num = float(match.group()) if match else 0.0
+    return max(0.0, min(100.0, num))
+
+
 async def reviewer(state: TripState) -> dict:
     user_input = state.get("user_input", "")
     tool_results = state.get("tool_results", {})
@@ -43,11 +59,18 @@ async def reviewer(state: TripState) -> dict:
     try:
         raw = await chat(REVIEWER_PROMPT, msg, response_format="json_object")
         data = json.loads(raw)
+        plan = normalize_plan(data.get("trip_plan"))
+        score = _parse_score(data.get("score"))
+        feedback = data.get("feedback") or None
+        if not plan_is_usable(plan):
+            # 结构不完整时不能给高分，否则会把空行程当成功结果落库
+            score = 0.0
+            feedback = feedback or "行程结构不完整（缺少日期或景点）"
         return {
-            "trip_plan": data.get("trip_plan") or {"days": []},
-            "score": float(data.get("score") or 0),
+            "trip_plan": plan,
+            "score": score,
             "reply": data.get("reply") or "",
-            "feedback": data.get("feedback") or None,
+            "feedback": feedback,
         }
     except Exception:  # noqa: BLE001
         return {"trip_plan": {"days": []}, "score": 0.0, "reply": "", "feedback": "生成失败，请重试"}

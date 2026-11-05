@@ -15,6 +15,7 @@ from app.nodes import reviewer as reviewer_mod
 from app.nodes import router as router_mod
 
 planner_prompts: list[str] = []
+rewrite_cities: list[str] = []
 
 
 async def fake_router_chat(system, user, **kwargs):
@@ -31,6 +32,7 @@ async def fake_tool(args):
 
 
 async def fake_rewrite(user_input, spots=None, city=""):
+    rewrite_cities.append(city)
     return {"dense_queries": [], "keywords": []}
 
 
@@ -62,6 +64,7 @@ async def fake_reviewer_chat(system, user, **kwargs):
 
 async def test_multi_turn_history_reaches_planner(monkeypatch):
     planner_prompts.clear()
+    rewrite_cities.clear()
     monkeypatch.setattr(settings, "hitl_enabled", False)
     monkeypatch.setattr(settings, "trip_persist_enabled", False)
     monkeypatch.setattr(router_mod, "chat", fake_router_chat)
@@ -84,6 +87,7 @@ async def test_multi_turn_history_reaches_planner(monkeypatch):
     assert first.values["score"] == 90
     assert first.values["history"][-1]["role"] == "assistant"
     assert "D1: 外滩" in first.values["history"][-1]["content"]
+    assert rewrite_cities[-1] == "上海"
 
     async for _ in graph.astream(
         {"user_input": "第二天不要博物馆", "session_id": "test-graph-memory"}, cfg

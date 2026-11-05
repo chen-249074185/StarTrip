@@ -37,8 +37,7 @@ class MCPClient:
 
     async def _run(self) -> None:
         try:
-            async with stdio_client(self._params) as (read, write):
-                async with ClientSession(read, write) as session:
+            async with stdio_client(self._params) as (read, write), ClientSession(read, write) as session:
                     await session.initialize()
                     resp = await session.list_tools()
                     self._tools = [
@@ -68,19 +67,38 @@ class MCPClient:
                                 fut.set_exception(e)
         except BaseException as e:  # noqa: BLE001
             self._error = e
-            if not self._ready.is_set():
-                self._ready.set()
+        finally:
+            # 会话断开：唤醒启动等待，并让队列里未完成的调用快速失败（否则会一直挂到上层超时）
+            self._ready.set()
+            if self._inbox is not None:
+                while True:
+                    try:
+                        fut, _, _ = self._inbox.get_nowait()
+                    except asyncio.QueueEmpty:
+                        break
+                    if fut is not None and not fut.done():
+                        fut.set_exception(RuntimeError("MCP 会话已断开"))
 
     @property
     def tools(self) -> list[dict]:
         return self._tools
 
+    @property
+    def alive(self) -> bool:
+        """后台会话任务是否仍在运行（用于断线重连判断）。"""
+        return self._task is not None and not self._task.done()
+
     async def call(self, name: str, arguments: dict[str, Any]) -> Any:
         """投递一次工具调用，等待后台任务返回结果。"""
         if self._inbox is None:
             raise RuntimeError("MCP client 未 start()")
+        if not self.alive:
+            raise RuntimeError("MCP 会话已断开")
         fut: asyncio.Future = asyncio.get_running_loop().create_future()
         await self._inbox.put((fut, name, arguments))
+        # 投递后会话恰好断开：若 finally 已清空队列，这里快速失败，避免永久等待
+        if not self.alive and not fut.done():
+            raise RuntimeError("MCP 会话已断开")
         return await fut
 
     async def close(self) -> None:

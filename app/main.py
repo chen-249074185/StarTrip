@@ -1,4 +1,5 @@
 
+import asyncio
 import json
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -19,7 +20,7 @@ from app.auth import (
 )
 from app.config import settings
 from app.db.checkpoint import init_checkpointer
-from app.db.pg import close_pool, init_schema, open_pool
+from app.db.pg import close_pool, fetch, init_schema, open_pool
 from app.db.redis import close_redis, init_redis, redis_ready
 from app.db.trips import get_trip, list_trips
 from app.observability import (
@@ -41,7 +42,7 @@ async def lifespan(_: FastAPI):
     tracing = setup_tracing()
     print(f"[startup] OTel tracing: {'on' if tracing else 'off'}")
     try:
-        open_pool()
+        await asyncio.to_thread(open_pool)
         await init_schema()
         checkpointer = await init_checkpointer()
         graph_module.set_checkpointer(checkpointer)
@@ -100,7 +101,7 @@ def node_summary(name: str, out: dict) -> dict:
 
 class ChatRequest(BaseModel):
     session_id: str = Field(min_length=1, max_length=128)
-    message: str
+    message: str = Field(min_length=1, max_length=8000)
 
 
 class ResumeRequest(BaseModel):
@@ -226,12 +227,21 @@ async def stream_graph(graph_input, config: dict):
             span.set_attribute("run.interrupted", interrupted)
 
 
+async def _pg_status() -> str:
+    """轻量探测 PG（2s 超时；连不上/池未打开都降级为 down，不阻塞 /health）。"""
+    try:
+        await asyncio.wait_for(fetch("SELECT 1"), timeout=2.0)
+        return "ok"
+    except Exception:  # noqa: BLE001
+        return "down"
+
+
 @app.get("/health")
 async def health() -> dict:
-    """健康检查：后续接入 PG / Redis / LLM / MCP 的真实探测。"""
+    """健康检查：PG / Redis / LLM / Checkpoint 状态。"""
     return {
         "status": "ok",
-        "pg": "unknown",
+        "pg": await _pg_status(),
         "redis": "ok" if redis_ready() else "down",
         "llm": "ok" if settings.deepseek_api_key else "unconfigured",
         "mcp": "unknown",

@@ -8,11 +8,11 @@ from __future__ import annotations
 
 from app.config import settings
 from app.db.trips import save_trip
+from app.plan import normalize_plan, plan_is_usable
 from app.state import TripState
 
 
-def _title(state: TripState) -> str:
-    plan = state.get("trip_plan") or {}
+def _title(state: TripState, plan: dict) -> str:
     city = state.get("city") or ""
     days = len(plan.get("days") or [])
     if city and days:
@@ -23,13 +23,13 @@ def _title(state: TripState) -> str:
 async def persist(state: TripState) -> dict:
     if not settings.trip_persist_enabled:
         return {}
-    plan = state.get("trip_plan")
+    plan = normalize_plan(state.get("trip_plan"))
     score = state.get("score")
     session_id = state.get("session_id") or ""
-    if not plan or score is None or not session_id:
+    if not plan_is_usable(plan) or score is None or not session_id:
         return {}
     try:
-        trip_id = await save_trip(session_id, _title(state), plan, float(score))
+        trip_id = await save_trip(session_id, _title(state, plan), plan, float(score))
         return {"trip_id": trip_id}
     except Exception as e:  # noqa: BLE001
         print(f"[persist] 行程落库失败: {e}")

@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 
 from app.rag.rewrite import rewrite
 from app.rag.search import dense_search, fetch_contents, rrf, sparse_search
 from app.state import TripState
 
 TOPK = 5
+logger = logging.getLogger(__name__)
 
 
 def _extract_spots(tool_results: dict) -> list[str]:
@@ -22,7 +24,8 @@ def _extract_spots(tool_results: dict) -> list[str]:
                 continue
             try:
                 data = json.loads(p)
-            except Exception:  # noqa: BLE001
+            except Exception:
+                logger.debug("跳过无法解析的工具结果", exc_info=True)
                 continue
             for poi in data.get("pois", []):
                 name = poi.get("name")
@@ -35,7 +38,7 @@ async def retriever(state: TripState) -> dict:
     user_input = state.get("user_input", "")
     spots = _extract_spots(state.get("tool_results", {}))
 
-    rw = await rewrite(user_input, spots)
+    rw = await rewrite(user_input, spots, state.get("city", ""))
     dense_ids, sparse_ids = await asyncio.gather(
         dense_search(rw["dense_queries"]),
         sparse_search(rw["keywords"]),

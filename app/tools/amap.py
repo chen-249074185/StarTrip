@@ -28,9 +28,15 @@ _lock = asyncio.Lock()
 
 
 async def _client_or_connect() -> MCPClient:
-    """惰性建立并复用 MCP 会话（加锁防并发重复连接）。"""
+    """惰性建立并复用 MCP 会话（加锁防并发重复连接）；会话断开时自动重连。"""
     global _client
     async with _lock:
+        if _client is not None and not _client.alive:
+            try:
+                await _client.close()
+            except Exception as e:  # noqa: BLE001
+                print(f"[amap] 关闭失效 MCP 会话失败: {e}")
+            _client = None
         if _client is None:
             c = MCPClient(amap_server_params(settings.amap_key))
             await c.start()

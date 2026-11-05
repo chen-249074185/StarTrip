@@ -31,34 +31,53 @@ def chunk_text(text: str, size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) 
     return [c for c in chunks if c.strip()]
 
 
+def _title(text: str, fallback: str = "") -> str:
+    return text.strip() or fallback
+
+
+async def replace_source(
+    source: str,
+    title: str,
+    chunks: list[str],
+    embs: list[list[float]],
+) -> int:
+    """同一来源先删后插：重复执行不会产生重复块（幂等重建）。"""
+    await execute("DELETE FROM docs WHERE source = %s", (source,))
+    for chunk, e in zip(chunks, embs, strict=True):
+        await execute(
+            "INSERT INTO docs (title, content, source, embedding) VALUES (%s, %s, %s, %s)",
+            (title, chunk, source, Vector(e)),
+        )
+    return len(chunks)
+
+
 async def main(kb_dir: Path) -> None:
     open_pool()
-    await init_schema()
+    try:
+        await init_schema()
 
-    files = sorted(kb_dir.glob("*.md")) if kb_dir.exists() else []
-    if not files:
-        print(f"未找到知识库文件（{kb_dir}），请放入 .md 后重试")
-        close_pool()
-        return
+        files = sorted(kb_dir.glob("*.md")) if kb_dir.exists() else []
+        if not files:
+            print(f"未找到知识库文件（{kb_dir}），请放入 .md 后重试")
+            return
 
-    total = 0
-    for f in files:
-        text = f.read_text(encoding="utf-8")
-        # title 取首行标题去掉 # 与"旅游攻略"，即中文城市名（如 北京）
-        title = text.splitlines()[0].lstrip("# ").replace("旅游攻略", "").strip() or f.stem
-        chunks = chunk_text(text)
-        if not chunks:
-            continue
-        embs = await embed(chunks)
-        for chunk, e in zip(chunks, embs):
-            await execute(
-                "INSERT INTO docs (title, content, source, embedding) VALUES (%s, %s, %s, %s)",
-                (title, chunk, str(f), Vector(e)),
+        total = 0
+        for f in files:
+            text = f.read_text(encoding="utf-8")
+            # title 取首行标题去掉 # 与"旅游攻略"，即中文城市名（如 北京）
+            title = _title(
+                text.splitlines()[0].lstrip("# ").replace("旅游攻略", ""),
+                f.stem,
             )
-            total += 1
-        print(f"{f.name}: {len(chunks)} chunks")
-    print(f"完成，共写入 {total} 条")
-    close_pool()
+            chunks = chunk_text(text)
+            if not chunks:
+                continue
+            embs = await embed(chunks)
+            total += await replace_source(str(f), title, chunks, embs)
+            print(f"{f.name}: {len(chunks)} chunks")
+        print(f"完成，共写入 {total} 条")
+    finally:
+        close_pool()
 
 
 if __name__ == "__main__":

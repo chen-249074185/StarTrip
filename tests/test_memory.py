@@ -67,6 +67,7 @@ async def test_router_appends_user_and_resets_turn(monkeypatch):
         "score": 90.0,
         "retry_count": 3,
         "trip_plan": {"days": []},
+        "trip_id": 40,
         "tasks": [{"tool": "old"}],
     }
     out = await router(state)
@@ -76,6 +77,7 @@ async def test_router_appends_user_and_resets_turn(monkeypatch):
     assert out["score"] is None
     assert out["retry_count"] == 0
     assert out["trip_plan"] is None
+    assert out["trip_id"] is None
     assert out["tasks"] == []
     assert out["history"][-1] == {"role": "user", "content": "第二天不要博物馆"}
     assert "D1 外滩、豫园" in captured["user"]

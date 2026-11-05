@@ -73,6 +73,18 @@ async def test_persist_saves_trip(monkeypatch):
 async def test_persist_skips_without_plan_or_disabled(monkeypatch):
     monkeypatch.setattr(settings, "trip_persist_enabled", True)
     assert await persist({"session_id": "s"}) == {}
+    assert (
+        await persist(
+            {"session_id": "s", "trip_plan": {"days": []}, "score": 88.0}
+        )
+        == {}
+    )
+    assert (
+        await persist(
+            {"session_id": "s", "trip_plan": {"days": "bad"}, "score": 88.0}
+        )
+        == {}
+    )
 
     monkeypatch.setattr(settings, "trip_persist_enabled", False)
     assert (

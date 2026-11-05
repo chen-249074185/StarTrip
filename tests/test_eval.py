@@ -48,6 +48,28 @@ async def test_judge_fallback(monkeypatch):
     assert "judge down" in result["issues"][0]
 
 
+async def test_judge_receives_golden_answer(monkeypatch):
+    captured: dict = {}
+
+    async def fake_chat(system, user, **kwargs):
+        captured["user"] = user
+        return (
+            '{"factual_consistency": 0.9, "grounded_rate": 0.8, '
+            '"answer_coverage": 0.75, "issues": []}'
+        )
+
+    monkeypatch.setattr(judge_mod, "chat", fake_chat)
+    result = await judge_trip(
+        "上海两日游",
+        _plan(),
+        {"tool_results": {}},
+        golden_answer="D1 外滩、豫园",
+    )
+    assert "标准答案" in captured["user"]
+    assert "D1 外滩、豫园" in captured["user"]
+    assert result["answer_coverage"] == 0.75
+
+
 def test_constraints_and_aggregate():
     constraints = match_constraints(
         _plan(),
@@ -59,18 +81,22 @@ def test_constraints_and_aggregate():
     rows = [
         {
             "score": 90,
+            "latency_ms": 1000,
             "judge": {
                 "factual_consistency": 0.8,
                 "grounded_rate": 0.6,
+                "answer_coverage": 0.7,
                 "format_valid": True,
             },
             "constraints": constraints,
         },
         {
             "score": 70,
+            "latency_ms": 3000,
             "judge": {
                 "factual_consistency": 0.4,
                 "grounded_rate": 0.2,
+                "answer_coverage": 0.3,
                 "format_valid": False,
             },
             "constraints": {
@@ -84,10 +110,14 @@ def test_constraints_and_aggregate():
     assert summary["cases"] == 2
     assert summary["factual_consistency"] == 0.6
     assert summary["grounded_rate"] == 0.4
+    assert summary["answer_coverage"] == 0.5
     assert summary["format_valid_rate"] == 0.5
     assert summary["constraint_include_rate"] == 0.3333
     assert summary["constraint_avoid_hits"] == 1
     assert summary["avg_review_score"] == 80.0
+    assert summary["avg_latency_ms"] == 2000.0
+    assert summary["p50_latency_ms"] == 2000.0
+    assert summary["p90_latency_ms"] == 2800.0
 
 
 def test_golden_set_schema():

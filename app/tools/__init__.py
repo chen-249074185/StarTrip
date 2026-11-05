@@ -5,8 +5,9 @@ executor 按 plan 里的 `tool` 名从注册表取函数调用，实现"工具�
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from functools import partial
-from typing import Any, Awaitable, Callable
+from typing import Any
 
 from app.tools.amap import AMAP_TOOLS, call_amap, close_amap
 from app.tools.weather import get_weather
@@ -35,4 +36,4 @@ for _name in AMAP_TOOLS:
 # 天气别名
 register("weather", lambda args: get_weather(args.get("city", "")))
 
-__all__ = ["REGISTRY", "register", "get_tool", "all_tool_names", "close_amap"]
+__all__ = ["REGISTRY", "all_tool_names", "close_amap", "get_tool", "register"]
