@@ -116,4 +116,15 @@ async def get_current_user(
 
 def thread_id_for(user_id: str | None, session_id: str) -> str:
     """Checkpoint 隔离：开启鉴权后，不同用户即使 session_id 相同也互不可见。"""
-    return f"{user_id}:{session_id}" if user_id else session_id
+    if user_id:
+        return f"{user_id}:{session_id}"
+    if settings.require_signed_session:
+        from app.session import verify_session
+
+        verified = verify_session(session_id)
+        if verified is None:
+            raise HTTPException(
+                401, "会话无效或已过期，请先调用 /api/session 获取会话 ID"
+            )
+        return verified
+    return session_id

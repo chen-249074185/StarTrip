@@ -17,8 +17,9 @@ from mcp.client.stdio import stdio_client
 class MCPClient:
     """单个 MCP server 的会话封装（后台任务 + 队列）。"""
 
-    def __init__(self, params: StdioServerParameters):
+    def __init__(self, params: StdioServerParameters, *, call_timeout: float = 30.0):
         self._params = params
+        self._call_timeout = max(1.0, float(call_timeout))
         self._tools: list[dict] = []
         self._task: asyncio.Task | None = None
         self._inbox: asyncio.Queue | None = None
@@ -38,33 +39,43 @@ class MCPClient:
     async def _run(self) -> None:
         try:
             async with stdio_client(self._params) as (read, write), ClientSession(read, write) as session:
-                    await session.initialize()
-                    resp = await session.list_tools()
-                    self._tools = [
-                        {
-                            "name": t.name,
-                            "description": t.description,
-                            "input_schema": getattr(t, "inputSchema", None),
-                        }
-                        for t in resp.tools
-                    ]
-                    self._ready.set()
-                    while True:
-                        fut, name, args = await self._inbox.get()
-                        if name is None:  # 关闭哨兵
-                            break
-                        try:
-                            res = await session.call_tool(name, args)
-                            texts = [
-                                item.text
-                                for item in res.content
-                                if getattr(item, "type", None) == "text"
-                            ]
-                            if not fut.done():
-                                fut.set_result(texts)
-                        except Exception as e:  # noqa: BLE001
-                            if not fut.done():
-                                fut.set_exception(e)
+                await session.initialize()
+                resp = await session.list_tools()
+                self._tools = [
+                    {
+                        "name": t.name,
+                        "description": t.description,
+                        "input_schema": getattr(t, "inputSchema", None),
+                    }
+                    for t in resp.tools
+                ]
+                self._ready.set()
+                while True:
+                    fut, name, args = await self._inbox.get()
+                    if name is None:  # 关闭哨兵
+                        break
+                    try:
+                        res = await asyncio.wait_for(
+                            session.call_tool(name, args), timeout=self._call_timeout
+                        )
+                        texts = [
+                            item.text
+                            for item in res.content
+                            if getattr(item, "type", None) == "text"
+                        ]
+                        if not fut.done():
+                            fut.set_result(texts)
+                    except TimeoutError:
+                        # 单次工具调用超时：结束会话，让下一次调用走重连，
+                        # 避免挂在已经卡死的 session 上拖垮后续请求。
+                        if not fut.done():
+                            fut.set_exception(
+                                TimeoutError(f"MCP 工具调用超时({self._call_timeout}s)")
+                            )
+                        break
+                    except Exception as e:  # noqa: BLE001
+                        if not fut.done():
+                            fut.set_exception(e)
         except BaseException as e:  # noqa: BLE001
             self._error = e
         finally:
@@ -105,7 +116,11 @@ class MCPClient:
         if self._inbox is not None:
             await self._inbox.put((None, None, None))
         if self._task is not None:
-            await self._task
+            try:
+                await asyncio.wait_for(self._task, timeout=5.0)
+            except (TimeoutError, asyncio.CancelledError):
+                self._task.cancel()
+                await asyncio.gather(self._task, return_exceptions=True)
             self._task = None
         self._inbox = None
 

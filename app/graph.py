@@ -14,7 +14,8 @@ from app.nodes.router import router
 from app.state import TripState
 
 SCORE_THRESHOLD = 80   # 评分达标线
-MAX_RETRY = 3          # 回环上限
+MAX_PLANNER_CALLS = 3  # 规划次数上限（首次 + 2 次重规划）
+MAX_REVIEW_FAILURES = 2  # Reviewer LLM 连续失败达到该次数直接收尾，避免空转
 
 
 # ===== 条件边 =====
@@ -29,11 +30,23 @@ def route_after_router(state: TripState) -> str:
     return "planner"
 
 
+def route_after_confirm(state: TripState) -> str:
+    """用户取消全部任务 → 直接收尾；否则执行。"""
+    if state.get("cancelled"):
+        return "remember"
+    return "executor"
+
+
 def route_after_review(state: TripState) -> str:
-    """评分达标或达回环上限 → 收尾；否则回 planner 重规划。"""
+    """评分达标 / 达规划上限 / 无有效反馈 / LLM 连续失败 → 收尾；否则回 planner。"""
     score = state.get("score") or 0.0
     retry = state.get("retry_count", 0)
-    if score >= SCORE_THRESHOLD or retry >= MAX_RETRY:
+    if score >= SCORE_THRESHOLD or retry >= MAX_PLANNER_CALLS:
+        return "remember"
+    if int(state.get("review_failures", 0)) >= MAX_REVIEW_FAILURES:
+        return "remember"
+    # 没有 feedback 说明模型自己也不知道哪里不好，再规划一次大概率还是同一版
+    if not state.get("feedback"):
         return "remember"
     return "planner"
 
@@ -63,7 +76,11 @@ def build_graph() -> StateGraph:
     g.add_edge("recommend", "remember")
 
     g.add_edge("planner", "confirm")
-    g.add_edge("confirm", "executor")
+    g.add_conditional_edges(
+        "confirm",
+        route_after_confirm,
+        {"executor": "executor", "remember": "remember"},
+    )
     g.add_edge("executor", "retriever")
     g.add_edge("retriever", "reviewer")
     g.add_conditional_edges(

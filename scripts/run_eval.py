@@ -20,6 +20,7 @@ from app.db.pg import close_pool, init_schema, open_pool
 from app.eval.judge import judge_trip
 from app.eval.metrics import aggregate, match_constraints
 from app.graph import compile_graph
+from app.grounding import ground_plan
 from app.tools import close_amap
 from app.validate import validate_plan
 
@@ -49,6 +50,7 @@ async def run_case(graph, case: dict) -> dict:
         must_include=case.get("must_include"),
         must_avoid=case.get("must_avoid"),
     )
+    grounding = ground_plan(plan, state.get("tool_results"), state.get("rag_hints"))
     return {
         "id": case["id"],
         "category": case.get("category", "uncategorized"),
@@ -58,6 +60,7 @@ async def run_case(graph, case: dict) -> dict:
         "judge": judged,
         "constraints": match_constraints(plan, case),
         "validation": validation.to_dict(),
+        "grounding": grounding,
         "latency_ms": latency_ms,
     }
 
@@ -83,6 +86,13 @@ def failed_row(case: dict, error: Exception) -> dict:
             "warnings": [],
             "checks": {},
             "metrics": {},
+        },
+        "grounding": {
+            "applicable": False,
+            "total": 0,
+            "grounded": 0,
+            "ungrounded": [],
+            "ratio": 0.0,
         },
         "latency_ms": None,
         "error": str(error),
@@ -116,6 +126,8 @@ def write_markdown(report: dict, path: Path) -> None:
         "budget_overrun_rate",
         "duplicate_rate",
         "avg_review_score",
+        "score_calibration_mae",
+        "avg_ungrounded_ratio",
         "error_cases",
         "avg_latency_ms",
         "p50_latency_ms",

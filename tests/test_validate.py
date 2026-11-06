@@ -72,6 +72,20 @@ def test_extract_constraints_cn_days_and_budget():
     assert constraints["budget"] == 1000
 
 
+def test_extract_constraints_wan_and_two_digit_cn_days():
+    assert extract_constraints("北京 1.5 万预算玩三天")["budget"] == 15000
+    assert extract_constraints("北京 1.5 万预算玩三天")["days"] == 3
+    assert extract_constraints("西安十一日游")["days"] == 11
+    assert extract_constraints("上海二十日游")["days"] == 20
+
+
+def test_time_range_accepts_tilde():
+    plan = _plan()
+    plan["days"][0]["spots"][0]["time"] = "09:00~10:30"
+    result = validate_plan(plan)
+    assert result.checks["time"] is True
+
+
 def test_missing_time_only_warns():
     plan = {"days": [{"date": "D1", "spots": [{"name": "外滩"}]}]}
     result = validate_plan(plan)

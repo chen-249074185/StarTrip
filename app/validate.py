@@ -12,8 +12,9 @@ from typing import Any
 
 from app.plan import normalize_plan
 
-_TIME_RE = re.compile(r"^\s*(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})\s*$")
+_TIME_RE = re.compile(r"^\s*(\d{1,2}):(\d{2})\s*[-~—–]\s*(\d{1,2}):(\d{2})\s*$")
 _BUDGET_RE = re.compile(r"(?:预算|人均|总共)\s*(\d{1,6})")
+_WAN_RE = re.compile(r"(?:预算|人均|总共)?\s*(\d+(?:\.\d+)?)\s*万")
 _AMOUNT_RE = re.compile(r"(\d{3,6})\s*元")
 _DAYS_RE = re.compile(r"([一二两三四五六七八九十\d]{1,2})\s*(?:天|日游)")
 
@@ -72,15 +73,33 @@ def _parse_days(text: str) -> int | None:
     raw = match.group(1)
     if raw.isdigit():
         return int(raw)
+    if raw == "十":
+        return 10
+    if raw.startswith("十"):
+        return 10 + (_CN_NUM.get(raw[1:], 0) if len(raw) == 2 else 0)
+    if raw.endswith("十"):
+        return _CN_NUM.get(raw[:-1], 0) * 10
+    if "十" in raw and len(raw) == 3:
+        return _CN_NUM.get(raw[0], 0) * 10 + _CN_NUM.get(raw[2], 0)
     return _CN_NUM.get(raw)
+
+
+def _parse_budget(text: str) -> int | None:
+    """预算抽取：优先“预算 1.5 万”，其次“3000 元 / 预算 3000”。"""
+    wan = _WAN_RE.search(text)
+    if wan:
+        return int(float(wan.group(1)) * 10000)
+    match = _BUDGET_RE.search(text) or _AMOUNT_RE.search(text)
+    if match:
+        return int(match.group(1))
+    return None
 
 
 def extract_constraints(user_input: str) -> dict:
     """从自然语言里抽取预算/天数；抽不到返回 None，校验时跳过。"""
     text = str(user_input or "")
-    budget_match = _BUDGET_RE.search(text) or _AMOUNT_RE.search(text)
     return {
-        "budget": int(budget_match.group(1)) if budget_match else None,
+        "budget": _parse_budget(text),
         "days": _parse_days(text),
     }
 
@@ -132,6 +151,8 @@ def validate_plan(
     missing_time = 0
     time_conflicts = 0
     duplicate_count = 0
+    travel_checks = 0
+    travel_conflicts = 0
 
     for day in plan_days:
         intervals: list[tuple[int, int, str]] = []
@@ -165,10 +186,13 @@ def validate_plan(
                 errors.append(f"{prev_name} 与 {name} 时间重叠")
                 continue
             travel = travel_times.get((prev_name, name))
-            if travel is not None and start - prev_end < travel:
-                checks["time"] = False
-                time_conflicts += 1
-                errors.append(f"{prev_name} → {name} 路程 {travel} 分钟，间隔不足")
+            if travel is not None:
+                travel_checks += 1
+                if start - prev_end < travel:
+                    checks["time"] = False
+                    time_conflicts += 1
+                    travel_conflicts += 1
+                    errors.append(f"{prev_name} → {name} 路程 {travel} 分钟，间隔不足")
 
     # 逐项预算与按天预算取较大值：LLM 可能只填其中一个
     day_budget = sum(_to_int(day.get("budget_total")) or 0 for day in plan_days)
@@ -214,5 +238,7 @@ def validate_plan(
             "missing_time": missing_time,
             "time_conflicts": time_conflicts,
             "duplicates": duplicate_count,
+            "travel_checks": travel_checks,
+            "travel_conflicts": travel_conflicts,
         },
     )

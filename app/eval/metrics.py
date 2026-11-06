@@ -61,6 +61,19 @@ def aggregate(rows: list[dict[str, Any]]) -> dict:
     validations = [row.get("validation") for row in rows if row.get("validation")]
     n_val = len(validations)
 
+    # 自评分（reviewer）与独立裁判分的偏差：越低说明“自评越可信”
+    calibration = [
+        abs(float(row.get("score") or 0) / 100.0 - float(row["judge"]["factual_consistency"]))
+        for row in rows
+        if row.get("score") is not None
+    ]
+    grounding_ratios = [
+        float(row["grounding"]["ratio"])
+        for row in rows
+        if isinstance(row.get("grounding"), dict)
+        and row["grounding"].get("applicable")
+    ]
+
     def rate(predicate) -> float:
         return round(sum(1 for v in validations if predicate(v)) / n_val, 4) if n_val else 0.0
 
@@ -79,6 +92,12 @@ def aggregate(rows: list[dict[str, Any]]) -> dict:
         "budget_overrun_rate": rate(lambda v: not (v.get("checks") or {}).get("budget", True)),
         "duplicate_rate": rate(lambda v: not (v.get("checks") or {}).get("duplicates", True)),
         "avg_review_score": avg(lambda r: float(r.get("score") or 0)),
+        "score_calibration_mae": round(sum(calibration) / len(calibration), 4)
+        if calibration
+        else 0.0,
+        "avg_ungrounded_ratio": round(sum(grounding_ratios) / len(grounding_ratios), 4)
+        if grounding_ratios
+        else 0.0,
         "error_cases": sum(1 for row in rows if row.get("error")),
         "avg_latency_ms": round(sum(latencies) / len(latencies), 1) if latencies else 0.0,
         "p50_latency_ms": round(_percentile(latencies, 0.5), 1),

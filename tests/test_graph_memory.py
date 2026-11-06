@@ -28,7 +28,17 @@ async def fake_planner_chat(system, user, **kwargs):
 
 
 async def fake_tool(args):
-    return ["外滩"]
+    return [
+        json.dumps(
+            {
+                "pois": [
+                    {"name": "外滩", "location": "121.490,31.240"},
+                    {"name": "豫园", "location": "121.492,31.227"},
+                ]
+            },
+            ensure_ascii=False,
+        )
+    ]
 
 
 async def fake_rewrite(user_input, spots=None, city=""):

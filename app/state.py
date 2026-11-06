@@ -23,16 +23,21 @@ class TripState(TypedDict, total=False):
 
     # ===== 检索 =====
     rag_hints: list[str]         # RAG 检索补充
+    rag_key: str | None          # 本轮检索缓存键（同一轮重规划不重复检索）
+    rag_degraded: bool           # 检索失败/降级标记（reviewer 据此降低确定性）
 
     # ===== 审查 / 落库 =====
     trip_plan: dict | None       # 行程方案
     score: float | None          # 审查评分（0~100）
     feedback: str | None         # 审查不达标原因（回环输入）
     validation: dict | None      # 确定性校验结果（时间/预算/重复/约束）
+    grounding: dict | None       # 景点接地检查（是否存在工具/攻略依据）
+    review_failures: int         # Reviewer LLM 连续失败次数（避免无意义重试）
     trip_id: int | None          # 落库后的 trips.id
 
     # ===== 控制 =====
-    retry_count: int             # 回环已用次数，上限 3
+    retry_count: int             # 规划次数（含首次），达到上限后收尾
+    cancelled: bool              # HITL 中用户取消全部任务
 
     # ===== 回复 =====
     reply: str | None            # 助手自然语言回复

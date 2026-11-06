@@ -47,3 +47,74 @@ async def test_reviewer_degrades_on_llm_error(monkeypatch):
     assert out["score"] == 0.0
     assert out["trip_plan"] == {"days": []}
     assert out["feedback"]
+
+
+async def test_reviewer_enforces_prefs_must_avoid(monkeypatch):
+    async def fake_chat(system, user, **kwargs):
+        return json.dumps(
+            {
+                "trip_plan": {
+                    "days": [
+                        {
+                            "date": "D1",
+                            "spots": [{"name": "外滩", "time": "09:00-10:30"}],
+                        }
+                    ]
+                },
+                "score": 95,
+                "reply": "已安排",
+                "feedback": "",
+            },
+            ensure_ascii=False,
+        )
+
+    async def fake_prefs(session_id):
+        return {"must_avoid": ["外滩"]}
+
+    monkeypatch.setattr(reviewer_mod, "chat", fake_chat)
+    monkeypatch.setattr(reviewer_mod, "get_prefs", fake_prefs)
+    out = await reviewer({"user_input": "上海一日游", "session_id": "s"})
+
+    assert out["score"] == 60.0
+    assert out["validation"]["checks"]["must_avoid"] is False
+    assert "避开" in out["validation"]["errors"][0]
+
+
+async def test_reviewer_caps_ungrounded_plan(monkeypatch):
+    async def fake_chat(system, user, **kwargs):
+        return json.dumps(
+            {
+                "trip_plan": {
+                    "days": [
+                        {
+                            "date": "D1",
+                            "spots": [
+                                {"name": "外滩", "time": "09:00-10:30"},
+                                {"name": "不存在的景点", "time": "11:00-12:00"},
+                            ],
+                        }
+                    ]
+                },
+                "score": 95,
+                "reply": "已安排",
+                "feedback": "",
+            },
+            ensure_ascii=False,
+        )
+
+    monkeypatch.setattr(reviewer_mod, "chat", fake_chat)
+    tool_results = {
+        "maps_text_search": [
+            json.dumps(
+                {"pois": [{"name": "外滩", "location": "121.490,31.240"}]},
+                ensure_ascii=False,
+            )
+        ]
+    }
+    out = await reviewer(
+        {"user_input": "上海一日游", "tool_results": tool_results, "rag_hints": []}
+    )
+
+    assert out["grounding"]["ungrounded"] == ["不存在的景点"]
+    assert out["score"] == 55.0
+    assert "找不到依据" in out["feedback"]

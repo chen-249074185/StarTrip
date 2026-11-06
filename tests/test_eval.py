@@ -115,6 +115,8 @@ def test_constraints_and_aggregate():
     assert summary["constraint_include_rate"] == 0.3333
     assert summary["constraint_avoid_hits"] == 1
     assert summary["avg_review_score"] == 80.0
+    assert summary["score_calibration_mae"] == 0.2
+    assert summary["avg_ungrounded_ratio"] == 0.0
     assert summary["avg_latency_ms"] == 2000.0
     assert summary["p50_latency_ms"] == 2000.0
     assert summary["p90_latency_ms"] == 2800.0

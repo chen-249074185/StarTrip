@@ -49,15 +49,25 @@ USERS_DDL = [
 TRIPS_DDL = [
     """
     CREATE TABLE IF NOT EXISTS trips (
-      id          BIGSERIAL PRIMARY KEY,
-      session_id  TEXT NOT NULL,
-      title       TEXT,
-      plan_json   JSONB NOT NULL,
-      score       NUMERIC(5,2),
-      created_at  TIMESTAMPTZ DEFAULT now()
+      id              BIGSERIAL PRIMARY KEY,
+      session_id      TEXT NOT NULL,
+      title           TEXT,
+      plan_json       JSONB NOT NULL,
+      score           NUMERIC(5,2),
+      status          TEXT DEFAULT 'ok',
+      validation_json JSONB,
+      grounding_json  JSONB,
+      created_at      TIMESTAMPTZ DEFAULT now()
     )
     """,
     "CREATE INDEX IF NOT EXISTS trips_session_created ON trips (session_id, created_at DESC)",
+]
+
+# 已有库的增量迁移（CREATE TABLE IF NOT EXISTS 不会补列）
+TRIPS_MIGRATIONS = [
+    "ALTER TABLE trips ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'ok'",
+    "ALTER TABLE trips ADD COLUMN IF NOT EXISTS validation_json JSONB",
+    "ALTER TABLE trips ADD COLUMN IF NOT EXISTS grounding_json JSONB",
 ]
 
 
@@ -92,7 +102,7 @@ def close_pool() -> None:
 
 def _init_schema_sync() -> None:
     with get_pool().connection() as conn:
-        for stmt in [*DOCS_DDL, *USERS_DDL, *TRIPS_DDL]:
+        for stmt in [*DOCS_DDL, *USERS_DDL, *TRIPS_DDL, *TRIPS_MIGRATIONS]:
             conn.execute(stmt)
 
 
@@ -118,3 +128,19 @@ def _execute_sync(query: str, params: tuple) -> None:
 
 async def execute(query: str, params: tuple = ()) -> None:
     await asyncio.to_thread(_execute_sync, query, params)
+
+
+def _execute_many_sync(query: str, params_list: list[tuple]) -> None:
+    with (
+        get_pool().connection() as conn,
+        conn.transaction(),
+        conn.cursor() as cur,
+    ):
+        cur.executemany(query, params_list)
+
+
+async def execute_many(query: str, params_list: list[tuple]) -> None:
+    """批量写入（单事务 executemany）；用于知识库构建，避免逐条往返。"""
+    if not params_list:
+        return
+    await asyncio.to_thread(_execute_many_sync, query, params_list)
