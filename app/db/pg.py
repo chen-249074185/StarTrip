@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
+import psycopg
 from pgvector.psycopg import register_vector
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
@@ -89,8 +90,21 @@ def get_pool() -> ConnectionPool:
 
 def open_pool() -> None:
     pool = get_pool()
+    # 全新数据库里 vector 扩展还不存在，configure=register_vector 会在建连时
+    # 报 "vector type not found"，导致连接池初始化失败。先用裸连接建扩展，
+    # 再打开连接池。
+    _ensure_vector_extension()
     pool.open()
     pool.wait(timeout=settings.db_pool_timeout)
+
+
+def _ensure_vector_extension() -> None:
+    with psycopg.connect(
+        settings.database_url,
+        autocommit=True,
+        connect_timeout=max(1, int(settings.db_pool_timeout)),
+    ) as conn:
+        conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
 
 
 def close_pool() -> None:
