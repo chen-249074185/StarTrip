@@ -3,16 +3,20 @@
 - 首次：从 user_input 拆解任务
 - 回环：携带 feedback 修正
 - LLM 失败/非法 JSON：降级为默认任务
+- 任务清单统一做白名单/参数/数量清洗（app.tasks），防止模型扇出
 """
 
 from __future__ import annotations
 
 import json
 
+from app.config import settings
 from app.llm import chat
 from app.memory import prior_history
 from app.prefs import format_prefs, get_prefs
 from app.state import TripState
+from app.tasks import sanitize_tasks
+from app.tools import all_tool_names
 
 PLANNER_PROMPT = """你是旅行规划任务拆解器。根据用户需求，输出要调用的工具任务清单 JSON：
 {"tasks": [{"tool": "<工具名>", "args": {...}}]}
@@ -22,7 +26,11 @@ PLANNER_PROMPT = """你是旅行规划任务拆解器。根据用户需求，输
 - maps_direction_driving: 驾车路线，args: {"origin": "...", "destination": "...", "city": "..."}
 - maps_weather: 城市天气，args: {"city": "..."}
 
-规则：先搜景点，必要时加路线/天气。只输出 JSON，不要解释。"""
+规则：
+- 先搜景点，必要时加路线/天气；
+- 只使用上面列出的工具名，不要编造；
+- 参数必须是 JSON 对象，值只能是字符串/数字/布尔；
+- 最多 6 个任务，只输出 JSON，不要解释。"""
 
 
 def _fallback(user_input: str, city: str = "") -> list[dict]:
@@ -40,7 +48,7 @@ async def planner(state: TripState) -> dict:
     city = state.get("city", "")
     feedback = state.get("feedback")
 
-    msg = f"用户需求:{user_input}"
+    msg = f"用户需求:{user_input[:2000]}"
     if city:
         msg += f"\n目的地:{city}"
     pref_text = format_prefs(await get_prefs(state.get("session_id", "")))
@@ -50,13 +58,24 @@ async def planner(state: TripState) -> dict:
     if prior:
         msg = f"最近对话:\n{prior}\n\n{msg}"
     if feedback:
-        msg += f"\n上次行程评价（请据此修正）:{feedback}"
+        msg += f"\n上次行程评价（请据此修正）:{str(feedback)[:800]}"
 
+    allowed = set(all_tool_names())
     try:
         raw = await chat(PLANNER_PROMPT, msg, response_format="json_object")
         data = json.loads(raw)
-        tasks = data.get("tasks") or _fallback(user_input, city)
+        tasks = sanitize_tasks(
+            data.get("tasks"),
+            allowed_tools=allowed,
+            max_tasks=settings.max_tasks,
+        )
+        if not tasks:
+            tasks = _fallback(user_input, city)
     except Exception:  # noqa: BLE001
+        tasks = _fallback(user_input, city)
+
+    tasks = sanitize_tasks(tasks, allowed_tools=allowed, max_tasks=settings.max_tasks)
+    if not tasks:
         tasks = _fallback(user_input, city)
 
     return {"tasks": tasks, "retry_count": retry}

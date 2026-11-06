@@ -16,6 +16,8 @@ from app.nodes.confirm import confirm
 class HitlState(TypedDict, total=False):
     tasks: list[dict]
     executed: bool
+    cancelled: bool
+    reply: str | None
 
 
 async def _after(state: HitlState) -> dict:
@@ -65,3 +67,21 @@ async def test_confirm_skips_retry(monkeypatch):
     monkeypatch.setattr(settings, "hitl_enabled", True)
     state = {"tasks": [{"tool": "x"}], "retry_count": 2}
     assert await confirm(state) == {}
+
+
+async def test_confirm_cancel_all_tasks(monkeypatch):
+    """用户把所有任务都取消 → 不能回退成原始任务，而是标记 cancelled。"""
+    monkeypatch.setattr(settings, "hitl_enabled", True)
+    graph = _build_graph()
+    cfg = {"configurable": {"thread_id": "test-hitl-cancel"}}
+    original = [{"tool": "maps_text_search", "args": {"city": "上海"}}]
+
+    async for _ in graph.astream({"tasks": original}, cfg):
+        pass
+    assert (await graph.aget_state(cfg)).next == ("confirm",)
+
+    async for _ in graph.astream(Command(resume={"tasks": []}), cfg):
+        pass
+    resumed = await graph.aget_state(cfg)
+    assert resumed.values["tasks"] == []
+    assert resumed.values["cancelled"] is True

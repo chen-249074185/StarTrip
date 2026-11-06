@@ -48,8 +48,20 @@ class Settings(BaseSettings):
     embed_timeout: float = 20.0
     tool_timeout: float = 8.0
     tool_max_retries: int = 2                # 工具最多尝试次数（含首次）
+    mcp_connect_timeout: float = 30.0        # MCP 子进程冷启动超时（和单次工具超时分开）
+    executor_deadline: float = 60.0          # 单轮所有工具的总预算，防任务扇出拖死请求
     breaker_failure_threshold: int = 5       # 连续失败多少次打开熔断
     breaker_reset_timeout: float = 30.0      # 打开后多少秒进入半开探测
+
+    # ===== 编排护栏 =====
+    max_tasks: int = 12                      # 单轮最多执行多少个工具任务（防 LLM 扇出）
+    max_tool_results_per_tool: int = 10      # 同名工具最多保留多少条结果
+    max_tool_result_chars: int = 8000        # 单条工具结果最大字符数（防 checkpoint 膨胀）
+    sse_heartbeat_seconds: float = 15.0      # SSE 心跳间隔
+
+    # ===== 质量校验 =====
+    travel_speed_kmh: float = 18.0           # 城市内驾车平均速度（用于无路线数据时的通勤估算）
+    grounding_max_ungrounded_ratio: float = 0.34  # 未接地景点占比超过该值直接压分
 
     # ===== HITL =====
     hitl_enabled: bool = True                # 执行前是否暂停，等待用户确认任务清单
@@ -70,6 +82,12 @@ class Settings(BaseSettings):
     auth_enabled: bool = False
     jwt_secret: str = ""
     jwt_expire_minutes: int = 120
+
+    # ===== 会话（AUTH_ENABLED=false 的公开 Demo 也建议开启） =====
+    # require_signed_session=true 时，客户端必须先用 /api/session 换取带签名的
+    # session_id，避免"猜到 session_id 就能读别人行程"。
+    require_signed_session: bool = False
+    session_secret: str = ""                 # 为空时回退 JWT_SECRET；再为空则启动警告
 
 
 @lru_cache

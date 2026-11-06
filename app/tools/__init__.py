@@ -9,7 +9,13 @@ from collections.abc import Awaitable, Callable
 from functools import partial
 from typing import Any
 
-from app.tools.amap import AMAP_TOOLS, call_amap, close_amap
+from app.tools.amap import (
+    AMAP_TOOLS,
+    amap_ready,
+    call_amap,
+    close_amap,
+    warm_up_amap,
+)
 from app.tools.weather import get_weather
 
 ToolFn = Callable[[dict], Awaitable[Any]]
@@ -36,4 +42,12 @@ for _name in AMAP_TOOLS:
 # 天气别名
 register("weather", lambda args: get_weather(args.get("city", "")))
 
-__all__ = ["REGISTRY", "all_tool_names", "close_amap", "get_tool", "register"]
+__all__ = [
+    "REGISTRY",
+    "all_tool_names",
+    "amap_ready",
+    "close_amap",
+    "get_tool",
+    "register",
+    "warm_up_amap",
+]

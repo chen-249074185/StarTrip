@@ -117,7 +117,9 @@ async def test_chat_sse_normal(monkeypatch):
     assert names[-1] == "done"
     result = dict(events)["result"]
     assert result["score"] == 88.0
+    assert result["status"] == "ok"
     assert result["trip_plan"]["days"][0]["spots"][0]["name"] == "外滩"
+    assert "warnings" in result
 
 
 async def test_chat_sse_interrupt(monkeypatch):
@@ -196,6 +198,14 @@ async def test_health_and_config():
     assert "amap_js_key" in data["data"]
     assert "amap_js_security_code" in data["data"]
     assert "auth_enabled" in data["data"]
+
+
+async def test_session_endpoint_issues_id():
+    resp = await post("/api/session", {})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["code"] == 0
+    assert data["data"]["session_id"]
 
 
 @pytest.mark.parametrize(

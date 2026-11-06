@@ -49,9 +49,15 @@ async def test_persist_saves_trip(monkeypatch):
     monkeypatch.setattr(settings, "trip_persist_enabled", True)
     captured: dict = {}
 
-    async def fake_save(session_id, title, plan, score):
+    async def fake_save(session_id, title, plan, score, **kwargs):
         captured.update(
-            {"session_id": session_id, "title": title, "plan": plan, "score": score}
+            {
+                "session_id": session_id,
+                "title": title,
+                "plan": plan,
+                "score": score,
+                **kwargs,
+            }
         )
         return 7
 
@@ -68,6 +74,7 @@ async def test_persist_saves_trip(monkeypatch):
     assert captured["session_id"] == "1:s"
     assert captured["title"] == "上海1日游"
     assert captured["score"] == 88.0
+    assert captured["status"] == "ok"
 
 
 async def test_persist_skips_invalid_validation(monkeypatch):

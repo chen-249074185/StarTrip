@@ -181,5 +181,650 @@
       "漓江",
       "象鼻山"
     ]
+  },
+  {
+    "id": "guangzhou-2d",
+    "input": "广州两日游，想看城市夜景和老建筑",
+    "days": 2,
+    "must_include": [
+      "广州塔",
+      "陈家祠"
+    ],
+    "category": "normal",
+    "golden_answer": "D1：广州塔、珠江夜游；D2：陈家祠、沙面、上下九。",
+    "key_facts": [
+      "广州塔",
+      "陈家祠"
+    ]
+  },
+  {
+    "id": "shenzhen-2d",
+    "input": "深圳周末两天，想看海和主题公园",
+    "days": 2,
+    "must_include": [
+      "世界之窗",
+      "大梅沙"
+    ],
+    "category": "normal",
+    "golden_answer": "D1：世界之窗；D2：大梅沙、海滨栈道。",
+    "key_facts": [
+      "世界之窗",
+      "大梅沙"
+    ]
+  },
+  {
+    "id": "nanjing-2d",
+    "input": "南京两日游，第一次去，想看历史景点",
+    "days": 2,
+    "must_include": [
+      "中山陵",
+      "夫子庙"
+    ],
+    "category": "normal",
+    "golden_answer": "D1：中山陵、明孝陵；D2：夫子庙、秦淮河、老门东。",
+    "key_facts": [
+      "中山陵",
+      "夫子庙"
+    ]
+  },
+  {
+    "id": "suzhou-2d",
+    "input": "苏州两天，想逛园林和古镇",
+    "days": 2,
+    "must_include": [
+      "拙政园",
+      "平江路"
+    ],
+    "category": "normal",
+    "golden_answer": "D1：拙政园、苏州博物馆；D2：平江路、山塘街。",
+    "key_facts": [
+      "拙政园",
+      "平江路"
+    ]
+  },
+  {
+    "id": "wuhan-2d",
+    "input": "武汉两日游，预算1000，想看江景",
+    "days": 2,
+    "must_include": [
+      "黄鹤楼",
+      "东湖"
+    ],
+    "category": "budget",
+    "golden_answer": "D1：黄鹤楼、户部巷、长江大桥；D2：东湖、湖北省博物馆。预算 1000 元。",
+    "key_facts": [
+      "黄鹤楼",
+      "东湖"
+    ]
+  },
+  {
+    "id": "tianjin-2d",
+    "input": "天津两天，想看夜景和洋楼",
+    "days": 2,
+    "must_include": [
+      "天津之眼",
+      "五大道"
+    ],
+    "category": "normal",
+    "golden_answer": "D1：天津之眼、海河夜景；D2：五大道、意式风情区。",
+    "key_facts": [
+      "天津之眼",
+      "五大道"
+    ]
+  },
+  {
+    "id": "kunming-2d",
+    "input": "昆明两日游，想看自然风光",
+    "days": 2,
+    "must_include": [
+      "滇池",
+      "石林"
+    ],
+    "category": "normal",
+    "golden_answer": "D1：滇池、海埂大坝；D2：石林。",
+    "key_facts": [
+      "滇池",
+      "石林"
+    ]
+  },
+  {
+    "id": "dali-2d",
+    "input": "大理三天，想环洱海，节奏慢一点",
+    "days": 3,
+    "must_include": [
+      "洱海",
+      "大理古城"
+    ],
+    "category": "multi_day",
+    "golden_answer": "D1：大理古城；D2：环洱海、喜洲古镇；D3：双廊、崇圣寺三塔。",
+    "key_facts": [
+      "洱海",
+      "大理古城"
+    ]
+  },
+  {
+    "id": "harbin-2d",
+    "input": "哈尔滨冬天两天，想看冰雪",
+    "days": 2,
+    "must_include": [
+      "中央大街",
+      "冰雪大世界"
+    ],
+    "category": "normal",
+    "golden_answer": "D1：中央大街、索菲亚教堂；D2：冰雪大世界。",
+    "key_facts": [
+      "中央大街",
+      "冰雪大世界"
+    ]
+  },
+  {
+    "id": "zhangjiajie-3d",
+    "input": "张家界三天，想看山和玻璃栈道",
+    "days": 3,
+    "must_include": [
+      "张家界国家森林公园",
+      "天门山"
+    ],
+    "category": "multi_day",
+    "golden_answer": "D1：张家界国家森林公园；D2：袁家界、天子山；D3：天门山玻璃栈道。",
+    "key_facts": [
+      "张家界国家森林公园",
+      "天门山"
+    ]
+  },
+  {
+    "id": "dunhuang-2d",
+    "input": "敦煌两日游，想看莫高窟和沙漠",
+    "days": 2,
+    "must_include": [
+      "莫高窟",
+      "鸣沙山"
+    ],
+    "category": "normal",
+    "golden_answer": "D1：莫高窟、鸣沙山月牙泉；D2：雅丹魔鬼城或敦煌古城。",
+    "key_facts": [
+      "莫高窟",
+      "鸣沙山"
+    ]
+  },
+  {
+    "id": "guiyang-2d",
+    "input": "贵阳两天，想看山水和古镇",
+    "days": 2,
+    "must_include": [
+      "甲秀楼",
+      "青岩古镇"
+    ],
+    "category": "normal",
+    "golden_answer": "D1：甲秀楼、黔灵山；D2：青岩古镇。",
+    "key_facts": [
+      "甲秀楼",
+      "青岩古镇"
+    ]
+  },
+  {
+    "id": "nanning-2d",
+    "input": "南宁两日游，想轻松逛逛",
+    "days": 2,
+    "must_include": [
+      "青秀山",
+      "中山路"
+    ],
+    "category": "normal",
+    "golden_answer": "D1：青秀山；D2：中山路美食街、南湖公园。",
+    "key_facts": [
+      "青秀山",
+      "中山路"
+    ]
+  },
+  {
+    "id": "fuzhou-2d",
+    "input": "福州两天，想看古巷和山",
+    "days": 2,
+    "must_include": [
+      "三坊七巷",
+      "鼓山"
+    ],
+    "category": "normal",
+    "golden_answer": "D1：三坊七巷、林则徐纪念馆；D2：鼓山、涌泉寺。",
+    "key_facts": [
+      "三坊七巷",
+      "鼓山"
+    ]
+  },
+  {
+    "id": "nanchang-2d",
+    "input": "南昌两日游，想看名楼",
+    "days": 2,
+    "must_include": [
+      "滕王阁",
+      "八一广场"
+    ],
+    "category": "normal",
+    "golden_answer": "D1：滕王阁、八一广场；D2：八一起义纪念馆、绳金塔。",
+    "key_facts": [
+      "滕王阁",
+      "八一广场"
+    ]
+  },
+  {
+    "id": "hefei-2d",
+    "input": "合肥两天，想逛公园和历史景点",
+    "days": 2,
+    "must_include": [
+      "包公园",
+      "逍遥津"
+    ],
+    "category": "normal",
+    "golden_answer": "D1：包公园、李鸿章故居；D2：逍遥津、三河古镇。",
+    "key_facts": [
+      "包公园",
+      "逍遥津"
+    ]
+  },
+  {
+    "id": "jinan-2d",
+    "input": "济南两日游，想看泉",
+    "days": 2,
+    "must_include": [
+      "趵突泉",
+      "大明湖"
+    ],
+    "category": "normal",
+    "golden_answer": "D1：趵突泉、芙蓉街；D2：大明湖、千佛山。",
+    "key_facts": [
+      "趵突泉",
+      "大明湖"
+    ]
+  },
+  {
+    "id": "zhengzhou-2d",
+    "input": "郑州两天，想去少林寺",
+    "days": 2,
+    "must_include": [
+      "少林寺",
+      "二七广场"
+    ],
+    "category": "normal",
+    "golden_answer": "D1：少林寺、塔林；D2：二七广场、河南博物院。",
+    "key_facts": [
+      "少林寺",
+      "二七广场"
+    ]
+  },
+  {
+    "id": "taiyuan-2d",
+    "input": "太原两日游，想看古建",
+    "days": 2,
+    "must_include": [
+      "晋祠",
+      "柳巷"
+    ],
+    "category": "normal",
+    "golden_answer": "D1：晋祠；D2：柳巷、山西博物院。",
+    "key_facts": [
+      "晋祠",
+      "柳巷"
+    ]
+  },
+  {
+    "id": "shenyang-2d",
+    "input": "沈阳两天，想看故宫",
+    "days": 2,
+    "must_include": [
+      "沈阳故宫",
+      "中街"
+    ],
+    "category": "normal",
+    "golden_answer": "D1：沈阳故宫、张氏帅府；D2：中街、北陵公园。",
+    "key_facts": [
+      "沈阳故宫",
+      "中街"
+    ]
+  },
+  {
+    "id": "dalian-2d",
+    "input": "大连两日游，想看海",
+    "days": 2,
+    "must_include": [
+      "星海广场",
+      "老虎滩"
+    ],
+    "category": "normal",
+    "golden_answer": "D1：星海广场、滨海路；D2：老虎滩海洋公园。",
+    "key_facts": [
+      "星海广场",
+      "老虎滩"
+    ]
+  },
+  {
+    "id": "ningbo-2d",
+    "input": "宁波两天，想逛老城",
+    "days": 2,
+    "must_include": [
+      "天一阁",
+      "老外滩"
+    ],
+    "category": "normal",
+    "golden_answer": "D1：天一阁、月湖；D2：老外滩、南塘老街。",
+    "key_facts": [
+      "天一阁",
+      "老外滩"
+    ]
+  },
+  {
+    "id": "wuxi-2d",
+    "input": "无锡两日游，想看太湖",
+    "days": 2,
+    "must_include": [
+      "鼋头渚",
+      "灵山"
+    ],
+    "category": "normal",
+    "golden_answer": "D1：鼋头渚；D2：灵山胜境、拈花湾。",
+    "key_facts": [
+      "鼋头渚",
+      "灵山"
+    ]
+  },
+  {
+    "id": "wenzhou-2d",
+    "input": "温州两天，想看山水",
+    "days": 2,
+    "must_include": [
+      "雁荡山",
+      "江心屿"
+    ],
+    "category": "normal",
+    "golden_answer": "D1：雁荡山；D2：江心屿、五马街。",
+    "key_facts": [
+      "雁荡山",
+      "江心屿"
+    ]
+  },
+  {
+    "id": "zhuhai-2d",
+    "input": "珠海两日游，想看海和亲子乐园",
+    "days": 2,
+    "must_include": [
+      "情侣路",
+      "长隆"
+    ],
+    "category": "normal",
+    "golden_answer": "D1：情侣路、日月贝；D2：长隆海洋王国。",
+    "key_facts": [
+      "情侣路",
+      "长隆"
+    ]
+  },
+  {
+    "id": "dongguan-2d",
+    "input": "东莞两天，想轻松逛逛",
+    "days": 2,
+    "must_include": [
+      "松山湖",
+      "可园"
+    ],
+    "category": "normal",
+    "golden_answer": "D1：松山湖；D2：可园、莞城老街。",
+    "key_facts": [
+      "松山湖",
+      "可园"
+    ]
+  },
+  {
+    "id": "zhongshan-2d",
+    "input": "中山两天，想看历史故居",
+    "days": 2,
+    "must_include": [
+      "孙中山故居",
+      "岐江公园"
+    ],
+    "category": "normal",
+    "golden_answer": "D1：孙中山故居；D2：岐江公园、孙文西路步行街。",
+    "key_facts": [
+      "孙中山故居",
+      "岐江公园"
+    ]
+  },
+  {
+    "id": "wulumuqi-2d",
+    "input": "乌鲁木齐两日游，想看天池",
+    "days": 2,
+    "must_include": [
+      "天山天池",
+      "大巴扎"
+    ],
+    "category": "normal",
+    "golden_answer": "D1：天山天池；D2：国际大巴扎、红山公园。",
+    "key_facts": [
+      "天山天池",
+      "大巴扎"
+    ]
+  },
+  {
+    "id": "lanzhou-2d",
+    "input": "兰州两天，想看黄河",
+    "days": 2,
+    "must_include": [
+      "中山桥",
+      "白塔山"
+    ],
+    "category": "normal",
+    "golden_answer": "D1：中山桥、黄河母亲像；D2：白塔山、正宁路夜市。",
+    "key_facts": [
+      "中山桥",
+      "白塔山"
+    ]
+  },
+  {
+    "id": "changbaishan-3d",
+    "input": "长白山三天，想看天池",
+    "days": 3,
+    "must_include": [
+      "天池",
+      "长白瀑布"
+    ],
+    "category": "multi_day",
+    "golden_answer": "D1：二道白河镇；D2：长白山北坡、天池；D3：长白瀑布、绿渊潭。",
+    "key_facts": [
+      "天池",
+      "长白瀑布"
+    ]
+  },
+  {
+    "id": "huangshan-2d",
+    "input": "黄山两日游，想看日出和古村",
+    "days": 2,
+    "must_include": [
+      "黄山",
+      "宏村"
+    ],
+    "category": "normal",
+    "golden_answer": "D1：黄山登山、住山上；D2：光明顶日出、宏村。",
+    "key_facts": [
+      "黄山",
+      "宏村"
+    ]
+  },
+  {
+    "id": "wuzhen-2d",
+    "input": "乌镇两天，想住一晚看夜景",
+    "days": 2,
+    "must_include": [
+      "西栅",
+      "东栅"
+    ],
+    "category": "normal",
+    "golden_answer": "D1：西栅、夜景；D2：东栅、茅盾故居。",
+    "key_facts": [
+      "西栅",
+      "东栅"
+    ]
+  },
+  {
+    "id": "pingyao-2d",
+    "input": "平遥两天，想看古城和票号",
+    "days": 2,
+    "must_include": [
+      "平遥古城",
+      "日升昌"
+    ],
+    "category": "normal",
+    "golden_answer": "D1：平遥古城墙、日升昌票号；D2：县衙、明清街。",
+    "key_facts": [
+      "平遥古城",
+      "日升昌"
+    ]
+  },
+  {
+    "id": "taishan-2d",
+    "input": "泰山两天，想夜爬看日出",
+    "days": 2,
+    "must_include": [
+      "泰山",
+      "岱庙"
+    ],
+    "category": "normal",
+    "golden_answer": "D1：岱庙、红门；D2：夜爬泰山、南天门看日出。",
+    "key_facts": [
+      "泰山",
+      "岱庙"
+    ]
+  },
+  {
+    "id": "wuyuan-2d",
+    "input": "婺源两天，想看油菜花和古村",
+    "days": 2,
+    "must_include": [
+      "篁岭",
+      "李坑"
+    ],
+    "category": "normal",
+    "golden_answer": "D1：篁岭；D2：李坑、江湾。",
+    "key_facts": [
+      "篁岭",
+      "李坑"
+    ]
+  },
+  {
+    "id": "foshan-2d",
+    "input": "佛山两天，想看武术和岭南文化",
+    "days": 2,
+    "must_include": [
+      "祖庙",
+      "岭南天地"
+    ],
+    "category": "normal",
+    "golden_answer": "D1：祖庙、黄飞鸿纪念馆；D2：岭南天地、南风古灶。",
+    "key_facts": [
+      "祖庙",
+      "岭南天地"
+    ]
+  },
+  {
+    "id": "shijiazhuang-2d",
+    "input": "石家庄两天，想看古城和寺庙",
+    "days": 2,
+    "must_include": [
+      "正定古城",
+      "隆兴寺"
+    ],
+    "category": "normal",
+    "golden_answer": "D1：正定古城；D2：隆兴寺、荣国府。",
+    "key_facts": [
+      "正定古城",
+      "隆兴寺"
+    ]
+  },
+  {
+    "id": "zhangye-2d",
+    "input": "张掖两天，想看丹霞",
+    "days": 2,
+    "must_include": [
+      "七彩丹霞",
+      "大佛寺"
+    ],
+    "category": "normal",
+    "golden_answer": "D1：七彩丹霞；D2：大佛寺、张掖国家湿地公园。",
+    "key_facts": [
+      "七彩丹霞",
+      "大佛寺"
+    ]
+  },
+  {
+    "id": "emeishan-2d",
+    "input": "峨眉山两天，想看金顶",
+    "days": 2,
+    "must_include": [
+      "峨眉山",
+      "金顶"
+    ],
+    "category": "normal",
+    "golden_answer": "D1：报国寺、清音阁；D2：金顶、万年寺。",
+    "key_facts": [
+      "峨眉山",
+      "金顶"
+    ]
+  },
+  {
+    "id": "fenghuang-2d",
+    "input": "凤凰古城两天，想住江边",
+    "days": 2,
+    "must_include": [
+      "凤凰古城",
+      "沱江"
+    ],
+    "category": "normal",
+    "golden_answer": "D1：凤凰古城、沱江夜景；D2：沈从文故居、南华山。",
+    "key_facts": [
+      "凤凰古城",
+      "沱江"
+    ]
+  },
+  {
+    "id": "jiuzhaigou-3d",
+    "input": "九寨沟三天，想看水和彩林",
+    "days": 3,
+    "must_include": [
+      "九寨沟",
+      "五花海"
+    ],
+    "category": "multi_day",
+    "golden_answer": "D1：成都出发；D2：九寨沟、五花海；D3：黄龙或返程。",
+    "key_facts": [
+      "九寨沟",
+      "五花海"
+    ]
+  },
+  {
+    "id": "shanghai-family-3d",
+    "input": "上海三天亲子游，预算3000，不想太赶",
+    "days": 3,
+    "must_include": [
+      "上海科技馆",
+      "外滩"
+    ],
+    "category": "budget",
+    "golden_answer": "D1：上海科技馆；D2：外滩、南京路；D3：上海动物园或迪士尼小镇。预算 3000 元，节奏放缓。",
+    "key_facts": [
+      "上海科技馆",
+      "外滩"
+    ]
+  },
+  {
+    "id": "beijing-autumn-5d",
+    "input": "北京五天，秋天去，想看经典景点",
+    "days": 5,
+    "must_include": [
+      "故宫",
+      "八达岭长城"
+    ],
+    "category": "multi_day",
+    "golden_answer": "D1：天安门、故宫；D2：八达岭长城；D3：颐和园、圆明园；D4：天坛、前门；D5：香山公园、什刹海。",
+    "key_facts": [
+      "故宫",
+      "八达岭长城"
+    ]
   }
 ]

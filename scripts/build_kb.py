@@ -1,23 +1,25 @@
 """离线构建知识库：读取目录下的 .md → 切块 → embedding → 写入 docs 表。
 
 用法：
-    python -m scripts.build_kb                 # 默认读 data/kb
+    python -m scripts.build_kb                 # 默认读 kb
     python -m scripts.build_kb scripts/sample_kb
 """
 
 from __future__ import annotations
 
 import asyncio
+import re
 import sys
 from pathlib import Path
 
 from pgvector import Vector
 
-from app.db.pg import close_pool, execute, init_schema, open_pool
+from app.db.pg import close_pool, execute, execute_many, init_schema, open_pool
 from app.llm import embed
 
 CHUNK_SIZE = 512
 CHUNK_OVERLAP = 50
+_MAX_CHUNKS_PER_DOC = 200
 
 
 def chunk_text(text: str, size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> list[str]:
@@ -29,6 +31,33 @@ def chunk_text(text: str, size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) 
         if i + size >= len(text):
             break
     return [c for c in chunks if c.strip()]
+
+
+_HEADING_RE = re.compile(r"(?m)^(?=#{1,3}\s)")
+
+
+def chunk_markdown(
+    text: str,
+    size: int = CHUNK_SIZE,
+    overlap: int = CHUNK_OVERLAP,
+) -> list[str]:
+    """按 Markdown 标题切段，段内过长再定长切。
+
+    比纯定长切块更能保住“景点/交通/避坑”这类小节的语义完整性；
+    限制单文档块数，防止异常大文件把知识库撑爆。
+    """
+    sections = [section.strip() for section in _HEADING_RE.split(text) if section.strip()]
+    if not sections:
+        return []
+    chunks: list[str] = []
+    for section in sections:
+        if len(section) <= size:
+            chunks.append(section)
+        else:
+            chunks.extend(chunk_text(section, size=size, overlap=overlap))
+        if len(chunks) >= _MAX_CHUNKS_PER_DOC:
+            break
+    return [chunk for chunk in chunks if chunk.strip()][:_MAX_CHUNKS_PER_DOC]
 
 
 def _title(text: str, fallback: str = "") -> str:
@@ -43,12 +72,17 @@ async def replace_source(
 ) -> int:
     """同一来源先删后插：重复执行不会产生重复块（幂等重建）。"""
     await execute("DELETE FROM docs WHERE source = %s", (source,))
-    for chunk, e in zip(chunks, embs, strict=True):
-        await execute(
-            "INSERT INTO docs (title, content, source, embedding) VALUES (%s, %s, %s, %s)",
-            (title, chunk, source, Vector(e)),
-        )
-    return len(chunks)
+    if not chunks:
+        return 0
+    params = [
+        (title, chunk, source, Vector(emb))
+        for chunk, emb in zip(chunks, embs, strict=True)
+    ]
+    await execute_many(
+        "INSERT INTO docs (title, content, source, embedding) VALUES (%s, %s, %s, %s)",
+        params,
+    )
+    return len(params)
 
 
 async def main(kb_dir: Path) -> None:
@@ -69,7 +103,7 @@ async def main(kb_dir: Path) -> None:
                 text.splitlines()[0].lstrip("# ").replace("旅游攻略", ""),
                 f.stem,
             )
-            chunks = chunk_text(text)
+            chunks = chunk_markdown(text)
             if not chunks:
                 continue
             embs = await embed(chunks)

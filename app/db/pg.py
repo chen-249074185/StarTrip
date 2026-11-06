@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
+import psycopg
 from pgvector.psycopg import register_vector
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
@@ -49,15 +50,25 @@ USERS_DDL = [
 TRIPS_DDL = [
     """
     CREATE TABLE IF NOT EXISTS trips (
-      id          BIGSERIAL PRIMARY KEY,
-      session_id  TEXT NOT NULL,
-      title       TEXT,
-      plan_json   JSONB NOT NULL,
-      score       NUMERIC(5,2),
-      created_at  TIMESTAMPTZ DEFAULT now()
+      id              BIGSERIAL PRIMARY KEY,
+      session_id      TEXT NOT NULL,
+      title           TEXT,
+      plan_json       JSONB NOT NULL,
+      score           NUMERIC(5,2),
+      status          TEXT DEFAULT 'ok',
+      validation_json JSONB,
+      grounding_json  JSONB,
+      created_at      TIMESTAMPTZ DEFAULT now()
     )
     """,
     "CREATE INDEX IF NOT EXISTS trips_session_created ON trips (session_id, created_at DESC)",
+]
+
+# 已有库的增量迁移（CREATE TABLE IF NOT EXISTS 不会补列）
+TRIPS_MIGRATIONS = [
+    "ALTER TABLE trips ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'ok'",
+    "ALTER TABLE trips ADD COLUMN IF NOT EXISTS validation_json JSONB",
+    "ALTER TABLE trips ADD COLUMN IF NOT EXISTS grounding_json JSONB",
 ]
 
 
@@ -79,8 +90,21 @@ def get_pool() -> ConnectionPool:
 
 def open_pool() -> None:
     pool = get_pool()
+    # 全新数据库里 vector 扩展还不存在，configure=register_vector 会在建连时
+    # 报 "vector type not found"，导致连接池初始化失败。先用裸连接建扩展，
+    # 再打开连接池。
+    _ensure_vector_extension()
     pool.open()
     pool.wait(timeout=settings.db_pool_timeout)
+
+
+def _ensure_vector_extension() -> None:
+    with psycopg.connect(
+        settings.database_url,
+        autocommit=True,
+        connect_timeout=max(1, int(settings.db_pool_timeout)),
+    ) as conn:
+        conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
 
 
 def close_pool() -> None:
@@ -92,7 +116,7 @@ def close_pool() -> None:
 
 def _init_schema_sync() -> None:
     with get_pool().connection() as conn:
-        for stmt in [*DOCS_DDL, *USERS_DDL, *TRIPS_DDL]:
+        for stmt in [*DOCS_DDL, *USERS_DDL, *TRIPS_DDL, *TRIPS_MIGRATIONS]:
             conn.execute(stmt)
 
 
@@ -118,3 +142,19 @@ def _execute_sync(query: str, params: tuple) -> None:
 
 async def execute(query: str, params: tuple = ()) -> None:
     await asyncio.to_thread(_execute_sync, query, params)
+
+
+def _execute_many_sync(query: str, params_list: list[tuple]) -> None:
+    with (
+        get_pool().connection() as conn,
+        conn.transaction(),
+        conn.cursor() as cur,
+    ):
+        cur.executemany(query, params_list)
+
+
+async def execute_many(query: str, params_list: list[tuple]) -> None:
+    """批量写入（单事务 executemany）；用于知识库构建，避免逐条往返。"""
+    if not params_list:
+        return
+    await asyncio.to_thread(_execute_many_sync, query, params_list)
